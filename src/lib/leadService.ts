@@ -12,7 +12,15 @@ import type {
 class LeadService {
   // POST /leads - Create a new lead
   async createLead(data: CreateLeadRequest): Promise<Lead> {
-    return await leadApiClient.post<Lead>('/leads', data);
+    console.log('LeadService: Creating lead with data:', data);
+    try {
+      const result = await leadApiClient.post<Lead>('/leads', data);
+      console.log('LeadService: Lead created successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('LeadService: Error creating lead:', error);
+      throw error;
+    }
   }
 
   // GET /leads - List leads with pagination and filters
@@ -35,7 +43,53 @@ class LeadService {
       });
     }
 
-    return await leadApiClient.get<PaginatedResponse<Lead>>(`/leads?${queryParams}`);
+    console.log('LeadService: Fetching leads with URL:', `/leads?${queryParams}`);
+
+    try {
+      const response = await leadApiClient.get<any>(`/leads?${queryParams}`);
+      console.log('LeadService: Raw API response:', response);
+
+      // Handle different response formats
+      let formattedResponse: PaginatedResponse<Lead>;
+
+      if (response.content && Array.isArray(response.content)) {
+        // Spring Boot paginated response format
+        formattedResponse = {
+          data: response.content,
+          total: response.totalElements || response.total || 0,
+          page: (response.number || response.page || 0) + 1, // Convert to 1-based
+          size: response.size || size,
+          totalPages: response.totalPages || 1,
+        };
+      } else if (Array.isArray(response)) {
+        // Direct array response
+        formattedResponse = {
+          data: response,
+          total: response.length,
+          page: page,
+          size: response.length,
+          totalPages: 1,
+        };
+      } else if (response.data && Array.isArray(response.data)) {
+        // Already formatted response
+        formattedResponse = response;
+      } else {
+        // Fallback
+        formattedResponse = {
+          data: [],
+          total: 0,
+          page: 1,
+          size: size,
+          totalPages: 1,
+        };
+      }
+
+      console.log('LeadService: Formatted response:', formattedResponse);
+      return formattedResponse;
+    } catch (error) {
+      console.error('LeadService: Error fetching leads:', error);
+      throw error;
+    }
   }
 
   // GET /leads/{id} - Get lead details by ID

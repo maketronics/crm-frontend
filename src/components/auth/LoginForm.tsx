@@ -38,26 +38,12 @@ export const LoginForm: React.FC = () => {
         response = await mockLogin(data.email, data.password);
         login(response.user, response.access_token, 'mock-refresh-token');
       } else {
-        try {
-          // Use real API authentication
-          response = await authService.login({
-            email: data.email,
-            password: data.password,
-          });
-          login(response.user, response.accessToken, response.refreshToken);
-        } catch (apiError: any) {
-          console.error('Real API login failed, trying mock fallback:', apiError);
-
-          // Fallback to mock authentication if real API fails
-          try {
-            response = await mockLogin(data.email, data.password);
-            login(response.user, response.access_token, 'mock-refresh-token');
-            console.log('Using mock authentication as fallback');
-          } catch (mockError) {
-            // If both fail, show the original API error
-            throw apiError;
-          }
-        }
+        // Use real API authentication
+        response = await authService.login({
+          email: data.email,
+          password: data.password,
+        });
+        login(response.user, response.accessToken, response.refreshToken);
       }
 
       navigate('/leads');

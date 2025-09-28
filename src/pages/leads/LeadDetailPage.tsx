@@ -87,7 +87,19 @@ export const LeadDetailPage: React.FC = () => {
     );
   }
 
-  const assignedUser = lead.assignedTo ? users.find(u => u.id === lead.assignedTo) : undefined;
+  const assignedUser = lead.assignedTo
+    ? users.find(u =>
+        u.id === lead.assignedTo ||
+        u.id === String(lead.assignedTo) ||
+        String(u.id) === lead.assignedTo ||
+        String(u.id) === String(lead.assignedTo)
+      )
+    : undefined;
+
+  // Debug logging
+  console.log('LeadDetailPage: lead.assignedTo:', lead.assignedTo, 'type:', typeof lead.assignedTo);
+  console.log('LeadDetailPage: users:', users.map(u => ({ id: u.id, name: u.name, type: typeof u.id })));
+  console.log('LeadDetailPage: assignedUser found:', assignedUser);
 
   return (
     <div className="space-y-6">

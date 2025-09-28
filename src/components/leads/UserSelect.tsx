@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronDownIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { Listbox, Transition } from '@headlessui/react';
 import type { User } from '../../types';
-import { apiClient } from '../../lib/api';
+import { authApiClient } from '../../lib/authApiClient';
 
 interface UserSelectProps {
   label?: string;
@@ -21,7 +21,7 @@ export const UserSelect: React.FC<UserSelectProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const selectedUser = users.find((user) => user.id === value);
+  const selectedUser = users?.find((user) => user.id === value);
 
   useEffect(() => {
     fetchUsers();
@@ -30,20 +30,40 @@ export const UserSelect: React.FC<UserSelectProps> = ({
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const response = await apiClient.get<{ data: User[] }>(
-        `/users?search=${searchTerm}&limit=20`
+      const response = await authApiClient.get<any>(
+        `/users?search=${searchTerm}&size=20`
       );
-      setUsers(response.data);
+
+      console.log('Users API response:', response); // Debug log
+
+      // Handle different response formats
+      let usersData = [];
+      if (Array.isArray(response)) {
+        // Direct array response
+        usersData = response;
+      } else if (response.content && Array.isArray(response.content)) {
+        // Spring Boot paginated response
+        usersData = response.content;
+      } else if (response.data && Array.isArray(response.data)) {
+        // Standard API response
+        usersData = response.data;
+      } else if (response.users && Array.isArray(response.users)) {
+        // Users property
+        usersData = response.users;
+      }
+
+      setUsers(usersData);
     } catch (error) {
       console.error('Failed to fetch users:', error);
+      setUsers([]); // Set empty array on error
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filteredUsers = users.filter((user) =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = (users || []).filter((user) =>
+    (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (user.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -137,10 +157,10 @@ export const UserSelect: React.FC<UserSelectProps> = ({
                         <>
                           <div>
                             <span className="block truncate font-medium">
-                              {user.name}
+                              {user.name || 'Unknown User'}
                             </span>
                             <span className="block truncate text-sm text-gray-500">
-                              {user.email}
+                              {user.email || 'No email'}
                             </span>
                           </div>
                           {selected && (

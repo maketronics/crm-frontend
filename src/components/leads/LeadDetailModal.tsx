@@ -17,6 +17,10 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  console.log('LeadDetailModal: Rendered with lead:', lead);
+  console.log('LeadDetailModal: assignedUser prop:', assignedUser);
+  console.log('LeadDetailModal: lead.assignedTo:', lead.assignedTo);
+
   const navigate = useNavigate();
 
   const handleViewFullDetails = () => {

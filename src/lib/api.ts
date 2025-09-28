@@ -4,7 +4,7 @@ import { authStore } from '../stores/authStore';
 import { mockRefreshToken, isMockMode } from './mockAuth';
 import type { ApiError } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_AUTH_API_BASE_URL || 'https://crm-dev0-auth-service-v1.make-tronics.com';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -47,7 +47,6 @@ class ApiClient {
             return this.client(originalRequest);
           } catch (refreshError) {
             authStore.getState().logout();
-            window.location.href = '/login';
             return Promise.reject(refreshError);
           }
         }
@@ -77,8 +76,8 @@ class ApiClient {
         response = apiResponse.data;
       }
 
-      const { access_token } = response;
-      authStore.getState().setAccessToken(access_token);
+      const { access_token, accessToken } = response;
+      authStore.getState().setAccessToken(access_token || accessToken);
     } catch (error) {
       throw new Error('Failed to refresh token');
     }

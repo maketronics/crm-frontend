@@ -28,23 +28,23 @@ export const userStore = create<UserStore>((set) => ({
 
   setUsers: (response: PaginatedResponse<User>) => {
     set({
-      users: response.data,
-      totalUsers: response.total,
-      currentPage: response.page,
-      totalPages: response.totalPages,
+      users: response?.data || [],
+      totalUsers: response?.total || 0,
+      currentPage: response?.page || 1,
+      totalPages: response?.totalPages || 1,
     });
   },
 
   addUser: (user: User) => {
     set((state) => ({
-      users: [user, ...state.users],
-      totalUsers: state.totalUsers + 1,
+      users: [user, ...(state.users || [])],
+      totalUsers: (state.totalUsers || 0) + 1,
     }));
   },
 
   updateUser: (id: string, updates: Partial<User>) => {
     set((state) => ({
-      users: state.users.map((user) =>
+      users: (state.users || []).map((user) =>
         user.id === id ? { ...user, ...updates } : user
       ),
     }));
@@ -52,8 +52,8 @@ export const userStore = create<UserStore>((set) => ({
 
   removeUser: (id: string) => {
     set((state) => ({
-      users: state.users.filter((user) => user.id !== id),
-      totalUsers: state.totalUsers - 1,
+      users: (state.users || []).filter((user) => user.id !== id),
+      totalUsers: Math.max(0, (state.totalUsers || 0) - 1),
     }));
   },
 

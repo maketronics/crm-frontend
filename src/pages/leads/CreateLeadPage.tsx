@@ -12,13 +12,28 @@ export const CreateLeadPage: React.FC = () => {
   const { addLead } = leadStore();
 
   const handleSubmit = async (data: CreateLeadRequest) => {
+    console.log('CreateLeadPage: Submitting lead data:', data);
+
     try {
+      console.log('CreateLeadPage: Calling leadService.createLead...');
       const newLead = await leadService.createLead(data);
+      console.log('CreateLeadPage: Lead created successfully:', newLead);
+
+      console.log('CreateLeadPage: Adding lead to store...');
       addLead(newLead);
+
+      console.log('CreateLeadPage: Navigating to leads page...');
       navigate('/leads', {
         state: { message: 'Lead created successfully', leadId: newLead.id },
       });
     } catch (error: any) {
+      console.error('CreateLeadPage: Error creating lead:', error);
+      console.error('CreateLeadPage: Error details:', {
+        message: error.message,
+        status: error.status,
+        data: error.data,
+        response: error.response
+      });
       throw error;
     }
   };

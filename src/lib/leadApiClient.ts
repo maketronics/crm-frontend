@@ -47,7 +47,6 @@ class LeadApiClient {
             return this.client(originalRequest);
           } catch (refreshError) {
             authStore.getState().logout();
-            window.location.href = '/login';
             return Promise.reject(refreshError);
           }
         }

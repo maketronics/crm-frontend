@@ -16,7 +16,9 @@ const leadSchema = z.object({
   currencyType: z.string().min(1, 'Currency is required'),
   labels: z.array(z.string()),
   sourceChannel: z.string().min(1, 'Source channel is required'),
-  assignedTo: z.string().optional(),
+  assignedTo: z.union([z.string(), z.number()]).optional().transform((val) =>
+    val ? String(val) : undefined
+  ),
   status: z.enum(['PENDING', 'IN_PROGRESS', 'CLOSED']).optional(),
   fileUrl: z.string().optional(),
 });
@@ -24,7 +26,7 @@ const leadSchema = z.object({
 type LeadFormData = z.infer<typeof leadSchema>;
 
 interface LeadFormProps {
-  onSubmit: (data: CreateLeadRequest) => void;
+  onSubmit: (data: CreateLeadRequest) => Promise<void>;
   isSubmitting?: boolean;
   initialData?: Lead;
   mode?: 'create' | 'edit';
@@ -60,6 +62,7 @@ export const LeadForm: React.FC<LeadFormProps> = ({
   mode = 'create',
 }) => {
   const [labels, setLabels] = useState<string[]>(initialData?.labels || []);
+  const [isFormSubmitting, setIsFormSubmitting] = useState(false);
   const user = authStore((state) => state.user);
   const isEditMode = mode === 'edit';
 
@@ -97,18 +100,40 @@ export const LeadForm: React.FC<LeadFormProps> = ({
     }
   }, [initialData]);
 
-  const handleFormSubmit = (data: LeadFormData) => {
+  const handleFormSubmit = async (data: LeadFormData) => {
+    console.log('LeadForm: Form data submitted:', data);
+    console.log('LeadForm: Current user:', user);
+    console.log('LeadForm: Labels:', labels);
+
+    setIsFormSubmitting(true);
+
     const submitData: CreateLeadRequest = {
-      ...data,
-      labels,
+      contactPerson: data.contactPerson,
+      organization: data.organization,
+      title: data.title,
+      value: data.value,
+      currencyType: data.currencyType,
+      sourceChannel: data.sourceChannel,
+      labels: labels,
+      assignedTo: data.assignedTo || undefined,
+      status: data.status || 'PENDING',
       createdBy: user?.id || user?.name || 'current-user',
+      fileUrl: data.fileUrl || undefined,
     };
 
-    onSubmit(submitData);
+    console.log('LeadForm: Final submit data:', submitData);
 
-    if (!isEditMode) {
-      reset();
-      setLabels([]);
+    try {
+      await onSubmit(submitData);
+
+      if (!isEditMode) {
+        reset();
+        setLabels([]);
+      }
+    } catch (error) {
+      console.error('LeadForm: Error during submission:', error);
+    } finally {
+      setIsFormSubmitting(false);
     }
   };
 
@@ -138,7 +163,15 @@ export const LeadForm: React.FC<LeadFormProps> = ({
         {isEditMode ? 'Edit Lead' : 'Create New Lead'}
       </h2>
 
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+      <form
+        onSubmit={handleSubmit((data) => {
+          console.log('LeadForm: React Hook Form handleSubmit called with data:', data);
+          handleFormSubmit(data);
+        }, (errors) => {
+          console.log('LeadForm: Form validation failed:', errors);
+        })}
+        className="space-y-6"
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Input
             label="Contact Person"
@@ -245,7 +278,11 @@ export const LeadForm: React.FC<LeadFormProps> = ({
           >
             {isEditMode ? 'Reset Changes' : 'Reset'}
           </Button>
-          <Button type="submit" isLoading={isSubmitting}>
+          <Button
+            type="submit"
+            isLoading={isSubmitting || isFormSubmitting}
+            onClick={() => console.log('LeadForm: Submit button clicked!')}
+          >
             {isEditMode ? 'Update Lead' : 'Create Lead'}
           </Button>
         </div>

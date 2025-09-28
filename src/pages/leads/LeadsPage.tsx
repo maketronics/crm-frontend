@@ -6,11 +6,12 @@ import { userStore } from '../../stores/userStore';
 import { leadService } from '../../lib/leadService';
 import { authService } from '../../lib/authService';
 import type { Lead, User, LeadFilters } from '../../types';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { PlusIcon } from '@heroicons/react/24/outline';
 
 export const LeadsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     leads,
     totalLeads,
@@ -31,16 +32,64 @@ export const LeadsPage: React.FC = () => {
 
   useEffect(() => {
     fetchLeads();
+  }, [currentPage]);
+
+  useEffect(() => {
     fetchUsers();
-  }, [currentPage, filters]);
+  }, []); // Only fetch users once on mount
+
+  useEffect(() => {
+    if (Object.keys(filters).length > 0) {
+      fetchLeads(1); // Reset to page 1 when filters change
+    }
+  }, [filters]);
+
+  // Handle navigation from create page
+  useEffect(() => {
+    if (location.state?.message) {
+      console.log('LeadsPage: Received message from create page:', location.state.message);
+      // Refresh leads when coming from create page
+      fetchLeads(1);
+      // Clear the state to prevent re-fetching on subsequent renders
+      navigate('/leads', { replace: true });
+    }
+  }, [location.state]);
 
   const fetchLeads = async (page = 1) => {
+    console.log('LeadsPage: Fetching leads for page:', page, 'with filters:', filters);
     setLoading(true);
     setError(null);
     try {
-      const response = await leadService.getLeads(page, 10, filters);
+      // Get raw response from the API
+      const queryParams = new URLSearchParams({
+        page: (page - 1).toString(),
+        size: '10',
+      });
+
+      // Add filters to query params
+      console.log('LeadsPage: Applying filters:', filters);
+      if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== '' && (!Array.isArray(value) || value.length > 0)) {
+            console.log(`LeadsPage: Adding filter ${key}=${value}`);
+            if (key === 'labels' && Array.isArray(value)) {
+              queryParams.set('labels', value.join(','));
+            } else {
+              queryParams.set(key, value.toString());
+            }
+          }
+        });
+      }
+
+      const apiUrl = `/leads?${queryParams}`;
+      console.log('LeadsPage: API URL:', apiUrl);
+
+      const { leadApiClient } = await import('../../lib/leadApiClient');
+      const response = await leadApiClient.get<any>(apiUrl);
+      console.log('LeadsPage: Raw API response:', response);
       setLeads(response);
     } catch (error: any) {
+      console.error('LeadsPage: Error fetching leads:', error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -48,11 +97,21 @@ export const LeadsPage: React.FC = () => {
   };
 
   const fetchUsers = async () => {
+    // Only fetch if we don't already have users
+    if (users && users.length > 0) {
+      console.log('LeadsPage: Users already loaded, skipping fetch');
+      return;
+    }
+
     try {
+      console.log('LeadsPage: Fetching users for dropdowns...');
       const response = await authService.getUsers(0, 100);
+      console.log('LeadsPage: Users fetched successfully:', response);
       setUsersInStore(response);
-    } catch (error) {
-      console.error('Failed to fetch users:', error);
+    } catch (error: any) {
+      console.error('LeadsPage: Failed to fetch users:', error);
+      // Don't block the leads page if users fail to load
+      setUsersInStore({ data: [], total: 0, page: 0, size: 100, totalPages: 0 });
     }
   };
 
@@ -92,7 +151,60 @@ export const LeadsPage: React.FC = () => {
   };
 
   const handleFiltersChange = (newFilters: LeadFilters) => {
+    console.log('LeadsPage: Filters changed:', newFilters);
     setFilters(newFilters);
+    // Fetch leads with new filters immediately
+    fetchLeadsWithFilters(1, newFilters);
+  };
+
+  const handleClearFilters = () => {
+    console.log('LeadsPage: Clearing all filters');
+    clearFilters();
+    // Fetch all leads without filters
+    fetchLeadsWithFilters(1, {});
+  };
+
+  // New function to fetch leads with specific filters
+  const fetchLeadsWithFilters = async (page = 1, customFilters?: LeadFilters) => {
+    const filtersToUse = customFilters !== undefined ? customFilters : filters;
+    console.log('LeadsPage: Fetching leads with custom filters:', filtersToUse);
+    setLoading(true);
+    setError(null);
+    try {
+      // Get raw response from the API
+      const queryParams = new URLSearchParams({
+        page: (page - 1).toString(),
+        size: '10',
+      });
+
+      // Add filters to query params
+      console.log('LeadsPage: Applying filters:', filtersToUse);
+      if (filtersToUse) {
+        Object.entries(filtersToUse).forEach(([key, value]) => {
+          if (value !== undefined && value !== '' && (!Array.isArray(value) || value.length > 0)) {
+            console.log(`LeadsPage: Adding filter ${key}=${value}`);
+            if (key === 'labels' && Array.isArray(value)) {
+              queryParams.set('labels', value.join(','));
+            } else {
+              queryParams.set(key, value.toString());
+            }
+          }
+        });
+      }
+
+      const apiUrl = `/leads?${queryParams}`;
+      console.log('LeadsPage: API URL:', apiUrl);
+
+      const { leadApiClient } = await import('../../lib/leadApiClient');
+      const response = await leadApiClient.get<any>(apiUrl);
+      console.log('LeadsPage: Raw API response:', response);
+      setLeads(response);
+    } catch (error: any) {
+      console.error('LeadsPage: Error fetching leads:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (isLoading && (!leads || leads.length === 0)) {
@@ -122,7 +234,7 @@ export const LeadsPage: React.FC = () => {
         <FilterBar
           filters={filters || {}}
           onFiltersChange={handleFiltersChange}
-          onClearFilters={clearFilters}
+          onClearFilters={handleClearFilters}
           users={users || []}
         />
       </div>

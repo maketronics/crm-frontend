@@ -42,6 +42,26 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
           <p className="mt-1 text-sm text-gray-900">{user.mobileNumber}</p>
         </div>
 
+        {user.password && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Password
+            </label>
+            <div className="mt-1 flex items-center space-x-2">
+              <p className="text-sm text-gray-900 font-mono bg-gray-50 px-3 py-2 rounded border">
+                {user.password}
+              </p>
+              <button
+                onClick={() => navigator.clipboard.writeText(user.password!)}
+                className="text-blue-600 hover:text-blue-800 text-sm"
+                title="Copy password"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Job Title

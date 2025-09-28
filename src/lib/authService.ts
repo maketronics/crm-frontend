@@ -59,6 +59,7 @@ class AuthService {
       id: '1',
       name: 'Admin User',
       email: 'admin@example.com',
+      password: 'admin123',
       mobileNumber: '+1234567890',
       title: 'System Administrator',
       roles: ['SUPERADMIN', 'ADMIN'],
@@ -72,6 +73,7 @@ class AuthService {
       id: '2',
       name: 'Regular User',
       email: 'user@example.com',
+      password: 'user123',
       mobileNumber: '+1234567891',
       title: 'Sales Representative',
       roles: ['USER'],
@@ -85,6 +87,7 @@ class AuthService {
       id: '3',
       name: 'Manager User',
       email: 'manager@example.com',
+      password: 'manager123',
       mobileNumber: '+1234567892',
       title: 'Sales Manager',
       roles: ['MANAGER', 'USER'],
@@ -207,10 +210,18 @@ class AuthService {
       params.append('active', filters.active.toString());
     }
 
-    const response = await authApiClient.get<PaginatedResponse<User>>(
+    const response = await authApiClient.get<any>(
       `/users?${params.toString()}`
     );
-    return response;
+
+    // Transform Spring Boot pagination format to our expected format
+    return {
+      data: response.content || [],
+      total: response.totalElements || 0,
+      page: response.number || 0,
+      size: response.size || 10,
+      totalPages: response.totalPages || 1,
+    };
   }
 
   async getUserById(id: string): Promise<User> {
@@ -219,8 +230,19 @@ class AuthService {
   }
 
   async createUser(data: CreateUserRequest): Promise<User> {
-    const response = await authApiClient.post<User>('/users', data);
-    return response;
+    try {
+      const response = await authApiClient.post<User>('/users', data);
+      return response;
+    } catch (error: any) {
+      console.error('Raw API Error for createUser:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        fullError: error
+      });
+      throw error;
+    }
   }
 
   async updateUser(id: string, data: CreateUserRequest): Promise<User> {

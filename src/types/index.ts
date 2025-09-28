@@ -2,6 +2,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  password?: string;
   mobileNumber: string;
   title: string;
   roles: string[];

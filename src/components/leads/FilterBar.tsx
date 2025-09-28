@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button, Input, Select } from '../ui';
 import type { LeadFilters, Lead, User } from '../../types';
 import { TagInput } from './TagInput';
@@ -34,16 +34,30 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   onClearFilters,
   users,
 }) => {
+  // Local state for form inputs before applying
+  const [localFilters, setLocalFilters] = useState<LeadFilters>(filters);
+
   const userOptions = [
     { value: '', label: 'All Users' },
     ...users.map((user) => ({ value: user.id, label: user.name })),
   ];
 
-  const updateFilter = (key: keyof LeadFilters, value: any) => {
-    onFiltersChange({
-      ...filters,
+  const updateLocalFilter = (key: keyof LeadFilters, value: any) => {
+    setLocalFilters({
+      ...localFilters,
       [key]: value,
     });
+  };
+
+  const applyFilters = () => {
+    console.log('FilterBar: Applying filters:', localFilters);
+    onFiltersChange(localFilters);
+  };
+
+  const clearFilters = () => {
+    const emptyFilters = {};
+    setLocalFilters(emptyFilters);
+    onClearFilters();
   };
 
   const hasActiveFilters = Object.values(filters).some(
@@ -51,40 +65,52 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     (!Array.isArray(value) || value.length > 0)
   );
 
+  const hasLocalChanges = JSON.stringify(localFilters) !== JSON.stringify(filters);
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={onClearFilters}>
-            Clear All
+        <div className="flex space-x-2">
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              Clear All
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={applyFilters}
+            disabled={!hasLocalChanges}
+            className={hasLocalChanges ? 'bg-blue-600 hover:bg-blue-700' : ''}
+          >
+            Apply Filters
           </Button>
-        )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <Input
           placeholder="Search contact or organization..."
-          value={filters.search || ''}
-          onChange={(e) => updateFilter('search', e.target.value)}
+          value={localFilters.search || ''}
+          onChange={(e) => updateLocalFilter('search', e.target.value)}
         />
 
         <Select
           options={statusOptions}
-          value={filters.status || ''}
-          onChange={(e) => updateFilter('status', e.target.value as Lead['status'])}
+          value={localFilters.status || ''}
+          onChange={(e) => updateLocalFilter('status', e.target.value as Lead['status'])}
         />
 
         <Select
           options={userOptions}
-          value={filters.assignedTo || ''}
-          onChange={(e) => updateFilter('assignedTo', e.target.value)}
+          value={localFilters.assignedTo || ''}
+          onChange={(e) => updateLocalFilter('assignedTo', e.target.value)}
         />
 
         <Select
           options={sourceChannelOptions}
-          value={filters.sourceChannel || ''}
-          onChange={(e) => updateFilter('sourceChannel', e.target.value)}
+          value={localFilters.sourceChannel || ''}
+          onChange={(e) => updateLocalFilter('sourceChannel', e.target.value)}
         />
       </div>
 
@@ -92,21 +118,23 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         <Input
           type="date"
           placeholder="From date"
-          value={filters.startDate || ''}
-          onChange={(e) => updateFilter('startDate', e.target.value)}
+          label="From Date"
+          value={localFilters.startDate || ''}
+          onChange={(e) => updateLocalFilter('startDate', e.target.value)}
         />
 
         <Input
           type="date"
           placeholder="To date"
-          value={filters.endDate || ''}
-          onChange={(e) => updateFilter('endDate', e.target.value)}
+          label="To Date"
+          value={localFilters.endDate || ''}
+          onChange={(e) => updateLocalFilter('endDate', e.target.value)}
         />
 
         <TagInput
           placeholder="Filter by labels..."
-          value={filters.labels || []}
-          onChange={(labels) => updateFilter('labels', labels)}
+          value={localFilters.labels || []}
+          onChange={(labels) => updateLocalFilter('labels', labels)}
         />
       </div>
     </div>

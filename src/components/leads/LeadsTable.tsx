@@ -24,13 +24,21 @@ export const LeadsTable: React.FC<LeadsTableProps> = ({
   onEdit,
   onDelete,
 }) => {
+  console.log('LeadsTable: Received leads:', leads);
+  console.log('LeadsTable: Leads count:', leads?.length || 0);
+
   const navigate = useNavigate();
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
   const getUserName = (userId: string) => {
-    const user = users.find((u) => u.id === userId);
+    if (!userId) return 'Unassigned';
+
+    // Handle both string and number user IDs
+    const user = users.find((u) => u.id === userId || u.id === String(userId) || String(u.id) === userId);
+    console.log('getUserName: Looking for userId:', userId, 'in users:', users.map(u => ({ id: u.id, name: u.name })));
+    console.log('getUserName: Found user:', user);
     return user ? user.name : 'Unknown User';
   };
 
@@ -124,7 +132,11 @@ export const LeadsTable: React.FC<LeadsTableProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate(`/leads/${lead.id}`)}
+            onClick={() => {
+              console.log('Eye button clicked for lead:', lead);
+              setSelectedLead(lead);
+              setIsDetailModalOpen(true);
+            }}
             title="View details"
           >
             <EyeIcon className="h-4 w-4" />
@@ -174,11 +186,25 @@ export const LeadsTable: React.FC<LeadsTableProps> = ({
         <>
           <LeadDetailModal
             lead={selectedLead}
-            assignedUser={
-              selectedLead.assignedTo
-                ? users.find((u) => u.id === selectedLead.assignedTo)
-                : undefined
-            }
+            assignedUser={(() => {
+              if (!selectedLead.assignedTo) {
+                console.log('LeadDetailModal: No assignedTo value');
+                return undefined;
+              }
+
+              console.log('LeadDetailModal: Looking for assignedTo:', selectedLead.assignedTo, 'type:', typeof selectedLead.assignedTo);
+              console.log('LeadDetailModal: Available users:', users.map(u => ({ id: u.id, name: u.name, type: typeof u.id })));
+
+              const foundUser = users.find((u) =>
+                u.id === selectedLead.assignedTo ||
+                u.id === String(selectedLead.assignedTo) ||
+                String(u.id) === selectedLead.assignedTo ||
+                String(u.id) === String(selectedLead.assignedTo)
+              );
+
+              console.log('LeadDetailModal: Found user:', foundUser);
+              return foundUser;
+            })()}
             isOpen={isDetailModalOpen}
             onClose={() => {
               setIsDetailModalOpen(false);
