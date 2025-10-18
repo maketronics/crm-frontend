@@ -1,9 +1,11 @@
 export { LeadForm } from './LeadForm';
 export { LeadsTable } from './LeadsTable';
 export { LeadDetailModal } from './LeadDetailModal';
+export { StageTransitionModal } from './StageTransitionModal';
 export { AssignModal } from './AssignModal';
 export { FilterBar } from './FilterBar';
 export { StatusPill } from './StatusPill';
 export { TagInput } from './TagInput';
 export { UserSelect } from './UserSelect';
 export { CommentsSection } from './CommentsSection';
+export { LeadDetailKanbanModal } from './LeadDetailKanbanModal';

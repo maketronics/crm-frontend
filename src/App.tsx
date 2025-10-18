@@ -5,6 +5,9 @@ import {
   Route,
   Navigate,
 } from 'react-router-dom';
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
+import { store, persistor } from './stores/store';
 import { Layout, ProtectedRoute } from './components/ui';
 import { LoginPage } from './pages/auth/LoginPage';
 import { UsersPage } from './pages/auth/UsersPage';
@@ -12,9 +15,10 @@ import { LeadsPage } from './pages/leads/LeadsPage';
 import { CreateLeadPage } from './pages/leads/CreateLeadPage';
 import { EditLeadPage } from './pages/leads/EditLeadPage';
 import { LeadDetailPage } from './pages/leads/LeadDetailPage';
+import { KanbanPage } from './pages/leads/KanbanPage';
 import { authStore } from './stores/authStore';
 
-function App() {
+function AppContent() {
   const isAuthenticated = authStore((state) => state.isAuthenticated);
 
   return (
@@ -51,6 +55,7 @@ function App() {
           />
 
           <Route path="leads" element={<LeadsPage />} />
+          <Route path="leads/kanban" element={<KanbanPage />} />
           <Route path="leads/create" element={<CreateLeadPage />} />
           <Route path="leads/:id" element={<LeadDetailPage />} />
           <Route path="leads/edit/:id" element={<EditLeadPage />} />
@@ -59,6 +64,16 @@ function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
+  );
+}
+
+function App() {
+  return (
+    <Provider store={store}>
+      <PersistGate loading={<div>Loading...</div>} persistor={persistor}>
+        <AppContent />
+      </PersistGate>
+    </Provider>
   );
 }
 

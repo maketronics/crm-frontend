@@ -44,7 +44,15 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ leadId }) => {
       };
 
       const createdComment = await leadService.addComment(leadId, commentData);
-      setComments([...comments, createdComment]);
+
+      // Ensure the comment has a proper timestamp if not provided by API
+      const commentWithTimestamp = {
+        ...createdComment,
+        createdAt: createdComment.createdAt || new Date().toISOString(),
+        createdBy: createdComment.createdBy || user.name || 'You'
+      };
+
+      setComments([...comments, commentWithTimestamp]);
       setNewComment('');
     } catch (error) {
       console.error('Failed to add comment:', error);
@@ -105,7 +113,11 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ leadId }) => {
                   {comment.createdBy}
                 </span>
                 <span className="text-sm text-gray-500">
-                  {new Date(comment.createdAt).toLocaleString()}
+                  {(() => {
+                    if (!comment.createdAt) return 'Just now';
+                    const date = new Date(comment.createdAt);
+                    return isNaN(date.getTime()) ? 'Just now' : date.toLocaleString();
+                  })()}
                 </span>
               </div>
               <p className="text-gray-700">{comment.message}</p>

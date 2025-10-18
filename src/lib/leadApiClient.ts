@@ -21,24 +21,84 @@ class LeadApiClient {
   }
 
   private setupInterceptors() {
-    this.client.interceptors.request.use((config) => {
-      const { accessToken } = authStore.getState();
-      if (accessToken) {
-        config.headers.Authorization = `Bearer ${accessToken}`;
-      }
-      return config;
-    });
+    // REQUEST INTERCEPTOR
+    this.client.interceptors.request.use(
+      (config) => {
+        const { accessToken } = authStore.getState();
 
+        if (accessToken) {
+          config.headers.Authorization = `Bearer ${accessToken}`;
+        }
+
+        // Safely build the full URL even if baseURL or url are undefined.
+        const base = config.baseURL ?? '';
+        const path = config.url ?? '';
+        const fullUrl = base
+          ? `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
+          : path;
+
+        // Normalize method
+        const method = (config.method || '').toUpperCase();
+
+        // Robust request body handling: strings, objects, FormData, blobs, etc.
+        let requestBody = '';
+        try {
+          const data = config.data;
+          if (data == null) {
+            requestBody = '';
+          } else if (typeof data === 'string') {
+            try {
+              requestBody = JSON.stringify(JSON.parse(data), null, 2);
+            } catch {
+              requestBody = data; // plain string
+            }
+          } else if (typeof FormData !== 'undefined' && data instanceof FormData) {
+            requestBody = '[FormData]';
+          } else if (typeof Blob !== 'undefined' && data instanceof Blob) {
+            requestBody = '[Blob]';
+          } else {
+            requestBody = JSON.stringify(data, null, 2);
+          }
+        } catch {
+          requestBody = String(config.data);
+        }
+
+        // LOG THE REQUEST
+        console.log('🔵 ========== API REQUEST ==========');
+        console.log('URL:', fullUrl);
+        console.log('Method:', method);
+        console.log('Headers:', config.headers);
+        console.log('Request Body:', requestBody);
+        console.log('🔵 ==================================');
+
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    // RESPONSE INTERCEPTOR
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        console.log('✅ API SUCCESS:', response.config.url, response.status);
+        return response;
+      },
       async (error: AxiosError) => {
+        // LOG THE ERROR
+        console.error('🔴 ========== API ERROR ==========');
+        console.error('URL:', error.config?.url);
+        console.error('Status:', error.response?.status);
+        console.error('Status Text:', error.response?.statusText);
+        console.error('Response Data:', error.response?.data);
+        console.error('Request Data:', error.config?.data);
+        console.error('🔴 ================================');
+
         const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
-
           try {
-            // Try to refresh token using auth service
             await this.refreshToken();
             const { accessToken } = authStore.getState();
             if (accessToken && originalRequest.headers) {

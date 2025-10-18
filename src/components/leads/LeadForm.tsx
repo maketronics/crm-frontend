@@ -20,7 +20,7 @@ const leadSchema = z.object({
     val ? String(val) : undefined
   ),
   status: z.enum(['PENDING', 'IN_PROGRESS', 'CLOSED']).optional(),
-  fileUrl: z.string().optional(),
+  file: z.any().optional(),
 });
 
 type LeadFormData = z.infer<typeof leadSchema>;
@@ -63,6 +63,7 @@ export const LeadForm: React.FC<LeadFormProps> = ({
 }) => {
   const [labels, setLabels] = useState<string[]>(initialData?.labels || []);
   const [isFormSubmitting, setIsFormSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const user = authStore((state) => state.user);
   const isEditMode = mode === 'edit';
 
@@ -85,7 +86,6 @@ export const LeadForm: React.FC<LeadFormProps> = ({
       sourceChannel: initialData.sourceChannel,
       assignedTo: initialData.assignedTo || '',
       status: initialData.status,
-      fileUrl: initialData.fileUrl || '',
     } : {
       currencyType: 'USD',
       status: 'PENDING',
@@ -100,10 +100,27 @@ export const LeadForm: React.FC<LeadFormProps> = ({
     }
   }, [initialData]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      console.log('LeadForm: File selected:', file.name);
+    }
+  };
+
+  const handleFileRemove = () => {
+    setSelectedFile(null);
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  };
+
   const handleFormSubmit = async (data: LeadFormData) => {
     console.log('LeadForm: Form data submitted:', data);
     console.log('LeadForm: Current user:', user);
     console.log('LeadForm: Labels:', labels);
+    console.log('LeadForm: Selected file:', selectedFile);
 
     setIsFormSubmitting(true);
 
@@ -118,7 +135,7 @@ export const LeadForm: React.FC<LeadFormProps> = ({
       assignedTo: data.assignedTo || undefined,
       status: data.status || 'PENDING',
       createdBy: user?.id || user?.name || 'current-user',
-      fileUrl: data.fileUrl || undefined,
+      file: selectedFile || undefined,
     };
 
     console.log('LeadForm: Final submit data:', submitData);
@@ -129,6 +146,7 @@ export const LeadForm: React.FC<LeadFormProps> = ({
       if (!isEditMode) {
         reset();
         setLabels([]);
+        setSelectedFile(null);
       }
     } catch (error) {
       console.error('LeadForm: Error during submission:', error);
@@ -148,13 +166,18 @@ export const LeadForm: React.FC<LeadFormProps> = ({
         sourceChannel: initialData.sourceChannel,
         assignedTo: initialData.assignedTo || '',
         status: initialData.status,
-        fileUrl: initialData.fileUrl || '',
       });
       setLabels(initialData.labels || []);
+      setSelectedFile(null);
     } else {
       reset();
       setLabels([]);
+      setSelectedFile(null);
     }
+  };
+
+  const handleFormError = (errors: any) => {
+    console.log('LeadForm: Form validation failed:', errors);
   };
 
   return (
@@ -164,12 +187,7 @@ export const LeadForm: React.FC<LeadFormProps> = ({
       </h2>
 
       <form
-        onSubmit={handleSubmit((data) => {
-          console.log('LeadForm: React Hook Form handleSubmit called with data:', data);
-          handleFormSubmit(data);
-        }, (errors) => {
-          console.log('LeadForm: Form validation failed:', errors);
-        })}
+        onSubmit={handleSubmit(handleFormSubmit, handleFormError)}
         className="space-y-6"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -243,12 +261,70 @@ export const LeadForm: React.FC<LeadFormProps> = ({
           />
         )}
 
-        <Input
-          label="File URL (Optional)"
-          placeholder="https://example.com/file.pdf"
-          {...register('fileUrl')}
-          error={errors.fileUrl?.message}
-        />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Attach File (Optional)
+          </label>
+          <div className="flex items-center space-x-3">
+            <input
+              type="file"
+              id="file-upload"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <label
+              htmlFor="file-upload"
+              className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <svg
+                className="h-5 w-5 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+              Choose File
+            </label>
+            {selectedFile && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">{selectedFile.name}</span>
+                <button
+                  type="button"
+                  onClick={handleFileRemove}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
+            {initialData?.fileUrl && !selectedFile && (
+              <a
+                href={initialData.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                View existing file
+              </a>
+            )}
+          </div>
+          <p className="mt-1 text-sm text-gray-500">
+            Supported formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (Max 10MB)
+          </p>
+        </div>
 
         <div className="border-t border-gray-200 pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
@@ -281,7 +357,6 @@ export const LeadForm: React.FC<LeadFormProps> = ({
           <Button
             type="submit"
             isLoading={isSubmitting || isFormSubmitting}
-            onClick={() => console.log('LeadForm: Submit button clicked!')}
           >
             {isEditMode ? 'Update Lead' : 'Create Lead'}
           </Button>

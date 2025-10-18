@@ -8,6 +8,7 @@ import { authService } from '../../lib/authService';
 import type { Lead, User, LeadFilters } from '../../types';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { PlusIcon } from '@heroicons/react/24/outline';
+import { Squares2X2Icon } from '@heroicons/react/24/outline';
 
 export const LeadsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -224,10 +225,19 @@ export const LeadsPage: React.FC = () => {
             Manage and track your sales leads
           </p>
         </div>
-        <Button onClick={() => navigate('/leads/create')}>
-          <PlusIcon className="h-4 w-4 mr-2" />
-          Create Lead
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => navigate('/leads/kanban')}
+          >
+            <Squares2X2Icon className="h-4 w-4 mr-2" />
+            Kanban View
+          </Button>
+          <Button onClick={() => navigate('/leads/create')}>
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Create Lead
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white shadow-sm rounded-lg">
