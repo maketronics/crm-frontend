@@ -11,7 +11,7 @@ import { store, persistor } from './stores/store';
 import { Layout, ProtectedRoute } from './components/ui';
 import { LoginPage } from './pages/auth/LoginPage';
 import { UsersPage } from './pages/auth/UsersPage';
-import { LeadsPage } from './pages/leads/LeadsPage';
+import LeadsPage from './pages/leads/LeadsPage';
 import { CreateLeadPage } from './pages/leads/CreateLeadPage';
 import { EditLeadPage } from './pages/leads/EditLeadPage';
 import { LeadDetailPage } from './pages/leads/LeadDetailPage';
