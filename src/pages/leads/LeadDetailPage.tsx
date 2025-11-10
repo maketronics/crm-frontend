@@ -1,311 +1,474 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { FaArrowLeft, FaEdit, FaTrash, FaPhone, FaEnvelope, FaBuilding, FaUser, FaFileDownload, FaExternalLinkAlt } from 'react-icons/fa';
 import { leadService } from '../../lib/leadService';
-import { userStore } from '../../stores/userStore';
-import type { Lead } from '../../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { Button, LoadingSpinner } from '../../components/ui';
-import { CommentsSection } from '../../components/leads';
+
+// Match API response structure exactly
+interface PersonDetails {
+  id: string;
+  name: string;
+  targetSegment: string;
+  phone: string;
+  email: string;
+  quotationLink: string;
+}
+
+interface Notes {
+  text: string;
+  fileUrls: string[];
+}
+
+interface LeadDetail {
+  id: string;
+  contactPerson: string;
+  organization: string;
+  title: string;
+  value: number;
+  currency: string;
+  label: string;
+  owner: string;
+  sourceChannel: string;
+  sourceChannelId: string;
+  sourceOrigin: string;
+  commentIds: string[] | null;
+  expectedCloseDate: string;
+  leadCreated: string;
+  updatedAt: string | null;
+  personDetails: PersonDetails;
+  notes: Notes;
+  stage: string;
+}
+
+// Toggle for mock data
+const USE_MOCK_DATA = true;
+
+const mockLeadDetail: LeadDetail = {
+  id: "a5e98c2e-3053-45c6-b7ec-f0b9f9dc897b",
+  contactPerson: "john",
+  organization: "abc",
+  title: "po",
+  value: 50000,
+  currency: "USD",
+  label: "HOT",
+  owner: "megha",
+  sourceChannel: "abc",
+  sourceChannelId: "12345",
+  sourceOrigin: "manual",
+  commentIds: null,
+  expectedCloseDate: "2025-11-05",
+  leadCreated: "2025-11-01T23:18:53.131",
+  updatedAt: null,
+  personDetails: {
+    id: "80eccc76-a339-4450-aabb-b3149c07fc11",
+    name: "ACME Lead",
+    targetSegment: "Electronics",
+    phone: "9876543210",
+    email: "reshmi@gmail.com",
+    quotationLink: "https://example.com/quote.pdf"
+  },
+  notes: {
+    text: "testing notes",
+    fileUrls: [
+      "http://res.cloudinary.com/dolx1bzdi/image/upload/v1762019336/lead_service/files/msuaijkgmjiciy5tqycq.jpg"
+    ]
+  },
+  stage: "LEAD"
+};
 
 export const LeadDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { users } = userStore();
-
-  const [lead, setLead] = useState<Lead | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [lead, setLead] = useState<LeadDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     if (id) {
-      fetchLead(id);
+      fetchLead();
     }
   }, [id]);
 
-  const fetchLead = async (leadId: string) => {
-    setIsLoading(true);
-    setError(null);
+  const fetchLead = async () => {
     try {
-      const leadData = await leadService.getLeadById(leadId);
-      setLead(leadData);
-    } catch (error: any) {
-      setError(error.message);
+      setLoading(true);
+
+      if (USE_MOCK_DATA) {
+        // Simulate API delay
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        setLead(mockLeadDetail);
+      } else {
+        const data = await leadService.getLeadById(id!);
+        setLead(data as LeadDetail);
+      }
+    } catch (error) {
+      console.error('Failed to fetch lead:', error);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!id || !lead) return;
+    try {
+      setDeleteLoading(true);
 
-    const confirmed = window.confirm(
-      `Are you sure you want to delete the lead "${lead.title}"? This action cannot be undone.`
-    );
-
-    if (confirmed) {
-      try {
-        await leadService.deleteLead(id);
+      if (USE_MOCK_DATA) {
+        // Mock delete
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        console.log('Lead deleted successfully (mock mode)');
         navigate('/leads', {
-          state: { message: 'Lead deleted successfully' },
+          state: {
+            message: 'Lead deleted successfully',
+            type: 'success'
+          }
         });
-      } catch (error: any) {
-        setError(error.message);
+      } else {
+        // Real API call
+        const response = await leadService.deleteLead(id!);
+        console.log('Delete response:', response);
+        navigate('/leads', {
+          state: {
+            message: response.message || 'Lead deleted successfully',
+            type: 'success'
+          }
+        });
       }
+    } catch (error: any) {
+      console.error('Failed to delete lead:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to delete lead';
+      setError(errorMessage);
+      alert(errorMessage);
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteModal(false);
     }
   };
 
-  if (isLoading) {
+  const getLabelColor = (label: string) => {
+    const colors: Record<string, string> = {
+      HOT: 'bg-red-100 text-red-700',
+      WARM: 'bg-yellow-100 text-yellow-700',
+      COLD: 'bg-blue-100 text-blue-700',
+    };
+    return colors[label] || 'bg-gray-100 text-gray-700';
+  };
+
+  const getStageDisplay = (stage: string) => {
+    return stage.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
+  };
+
+  if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
+      <div className="flex items-center justify-center h-full">
+        <div className="text-gray-500">Loading lead details...</div>
       </div>
     );
   }
 
-  if (error || !lead) {
+  if (!lead) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/leads')}
-            className="p-2"
-          >
-            <ArrowLeftIcon className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Lead Details</h1>
-          </div>
-        </div>
-
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-red-600">
-            {error || 'Lead not found'}
-          </p>
-        </div>
+      <div className="flex flex-col items-center justify-center h-full">
+        <div className="text-gray-500 mb-4">Lead not found</div>
+        <button
+          onClick={() => navigate('/leads')}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >
+          Back to Leads
+        </button>
       </div>
     );
   }
-
-  const assignedUser = lead.assignedTo
-    ? users.find(u =>
-        u.id === lead.assignedTo ||
-        u.id === String(lead.assignedTo) ||
-        String(u.id) === lead.assignedTo ||
-        String(u.id) === String(lead.assignedTo)
-      )
-    : undefined;
-
-  // Debug logging
-  console.log('LeadDetailPage: lead.assignedTo:', lead.assignedTo, 'type:', typeof lead.assignedTo);
-  console.log('LeadDetailPage: users:', users.map(u => ({ id: u.id, name: u.name, type: typeof u.id })));
-  console.log('LeadDetailPage: assignedUser found:', assignedUser);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Mock Mode Banner */}
+      {USE_MOCK_DATA && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-2 flex items-center justify-between flex-shrink-0">
+          <span className="text-sm text-yellow-800">
+            🎭 <strong>Mock Mode:</strong> Using sample data
+          </span>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
+          <button
             onClick={() => navigate('/leads')}
-            className="p-2"
+            className="p-2 hover:bg-gray-100 rounded"
           >
-            <ArrowLeftIcon className="h-5 w-5" />
-          </Button>
+            <FaArrowLeft size={18} />
+          </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Lead Details</h1>
-            <p className="text-gray-600">
-              {lead.contactPerson} • {lead.organization}
-            </p>
+            <h1 className="text-2xl font-semibold text-gray-900">{lead.title}</h1>
+            <p className="text-sm text-gray-500 mt-1">{lead.organization}</p>
           </div>
         </div>
-
-        <div className="flex space-x-3">
-          <Button
-            variant="secondary"
-            onClick={() => navigate(`/leads/edit/${lead.id}`)}
+        <div className="flex space-x-2">
+          <button
+            onClick={() => navigate(`/leads/edit/${id}`)}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center space-x-2"
           >
-            <PencilIcon className="h-4 w-4 mr-2" />
-            Edit Lead
-          </Button>
-          <Button
-            variant="danger"
-            onClick={handleDelete}
+            <FaEdit size={14} />
+            <span>Edit</span>
+          </button>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center space-x-2"
           >
-            <TrashIcon className="h-4 w-4 mr-2" />
-            Delete Lead
-          </Button>
+            <FaTrash size={14} />
+            <span>Delete</span>
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Lead Information */}
-        <div className="lg:col-span-2">
-          <div className="card p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">
-              Lead Information
+      {/* Content */}
+      <div className="flex-1 overflow-auto p-6 bg-gray-50">
+        <div className="max-w-5xl mx-auto space-y-6">
+          {/* Status Bar */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Current Stage</p>
+                <p className="text-lg font-semibold text-gray-900">{getStageDisplay(lead.stage)}</p>
+              </div>
+              <div className="flex items-center space-x-4">
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getLabelColor(lead.label)}`}>
+                  {lead.label}
+                </span>
+                {lead.value && (
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500">Value</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {lead.currency} {lead.value.toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Information */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">
+              Contact Information
             </h2>
-
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex items-start space-x-3">
+                <FaUser className="text-gray-400 mt-1" size={18} />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Contact Person
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900">{lead.contactPerson}</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Organization
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900">{lead.organization}</p>
+                  <p className="text-sm text-gray-500">Contact Person</p>
+                  <p className="text-base font-medium text-gray-900">{lead.contactPerson}</p>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Title
-                </label>
-                <p className="mt-1 text-sm text-gray-900">{lead.title}</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex items-start space-x-3">
+                <FaUser className="text-gray-400 mt-1" size={18} />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Value
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900 font-medium">
-                    {new Intl.NumberFormat('en-US', {
-                      style: 'currency',
-                      currency: lead.currencyType,
-                    }).format(lead.value)}
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Source Channel
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900 capitalize">
-                    {lead.sourceChannel}
-                  </p>
+                  <p className="text-sm text-gray-500">Name</p>
+                  <p className="text-base font-medium text-gray-900">{lead.personDetails.name}</p>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Labels
-                </label>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {lead.labels.length > 0 ? (
-                    lead.labels.map((label) => (
-                      <span
-                        key={label}
-                        className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full"
-                      >
-                        {label}
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-sm text-gray-500">No labels</p>
-                  )}
+              <div className="flex items-start space-x-3">
+                <FaBuilding className="text-gray-400 mt-1" size={18} />
+                <div>
+                  <p className="text-sm text-gray-500">Organization</p>
+                  <p className="text-base font-medium text-gray-900">{lead.organization}</p>
                 </div>
               </div>
 
-              {lead.fileUrl && (
+              <div className="flex items-start space-x-3">
+                <FaPhone className="text-gray-400 mt-1" size={18} />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Attached File
-                  </label>
-                  <div className="mt-1">
-                    <a
-                      href={lead.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 underline"
-                    >
-                      View File
-                    </a>
+                  <p className="text-sm text-gray-500">Phone</p>
+                  <a href={`tel:${lead.personDetails.phone}`} className="text-base font-medium text-indigo-600 hover:text-indigo-800">
+                    {lead.personDetails.phone}
+                  </a>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <FaEnvelope className="text-gray-400 mt-1" size={18} />
+                <div>
+                  <p className="text-sm text-gray-500">Email</p>
+                  <a href={`mailto:${lead.personDetails.email}`} className="text-base font-medium text-indigo-600 hover:text-indigo-800">
+                    {lead.personDetails.email}
+                  </a>
+                </div>
+              </div>
+
+              {lead.personDetails.targetSegment && (
+                <div className="flex items-start space-x-3">
+                  <FaBuilding className="text-gray-400 mt-1" size={18} />
+                  <div>
+                    <p className="text-sm text-gray-500">Target Segment</p>
+                    <p className="text-base font-medium text-gray-900">{lead.personDetails.targetSegment}</p>
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Comments Section */}
-          <div className="card p-6 mt-6">
-            <CommentsSection leadId={lead.id} />
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Status & Assignment */}
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Status & Assignment
-            </h3>
-
-            <div className="space-y-4">
+          {/* Lead Details */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">
+              Lead Details
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Status
-                </label>
-                <span
-                  className={`mt-1 inline-block px-3 py-1 text-sm rounded-full ${
-                    lead.status === 'PENDING'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : lead.status === 'IN_PROGRESS'
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {lead.status.replace('_', ' ')}
-                </span>
+                <p className="text-sm text-gray-500">Owner</p>
+                <p className="text-base font-medium text-gray-900">{lead.owner}</p>
+              </div>
+
+              {lead.expectedCloseDate && (
+                <div>
+                  <p className="text-sm text-gray-500">Expected Close Date</p>
+                  <p className="text-base font-medium text-gray-900">
+                    {new Date(lead.expectedCloseDate).toLocaleDateString()}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-sm text-gray-500">Currency</p>
+                <p className="text-base font-medium text-gray-900">{lead.currency}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Assigned To
-                </label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {assignedUser ? assignedUser.name : 'Unassigned'}
-                </p>
-                {assignedUser && (
-                  <p className="text-xs text-gray-500">{assignedUser.email}</p>
-                )}
+                <p className="text-sm text-gray-500">Stage</p>
+                <p className="text-base font-medium text-gray-900">{getStageDisplay(lead.stage)}</p>
               </div>
             </div>
           </div>
 
-          {/* Audit Information */}
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Audit Information
-            </h3>
-
-            <div className="space-y-4">
+          {/* Source Information */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">
+              Source Information
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Created By
-                </label>
-                <p className="mt-1 text-sm text-gray-900">{lead.createdBy}</p>
+                <p className="text-sm text-gray-500">Source Channel</p>
+                <p className="text-base font-medium text-gray-900">{lead.sourceChannel}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Created Date
-                </label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {new Date(lead.createdDate).toLocaleDateString()} at{' '}
-                  {new Date(lead.createdDate).toLocaleTimeString()}
+                <p className="text-sm text-gray-500">Source Channel ID</p>
+                <p className="text-base font-medium text-gray-900">{lead.sourceChannelId}</p>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Source Origin</p>
+                <p className="text-base font-medium text-gray-900">{lead.sourceOrigin}</p>
+              </div>
+
+              {lead.personDetails.quotationLink && (
+                <div>
+                  <p className="text-sm text-gray-500">Quotation Link</p>
+
+                  <a href={lead.personDetails.quotationLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-base font-medium text-indigo-600 hover:text-indigo-800 flex items-center space-x-2"
+                  >
+                    <span>View Quotation</span>
+                    <FaExternalLinkAlt size={12} />
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Notes & Attachments */}
+          {(lead.notes.text || lead.notes.fileUrls.length > 0) && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">
+                Notes & Attachments
+              </h2>
+
+              {lead.notes.text && (
+                <div className="mb-4">
+                  <p className="text-sm text-gray-500 mb-2">Notes</p>
+                  <p className="text-gray-700 whitespace-pre-wrap">{lead.notes.text}</p>
+                </div>
+              )}
+
+              {lead.notes.fileUrls.length > 0 && (
+                <div>
+                  <p className="text-sm text-gray-500 mb-2">Attachments</p>
+                  <div className="space-y-2">
+                    {lead.notes.fileUrls.map((url, index) => (
+                      <a
+                        key={index}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-2 text-indigo-600 hover:text-indigo-800"
+                      >
+                        <FaFileDownload size={14} />
+                        <span className="text-sm">Attachment {index + 1}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Timeline */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">
+              Timeline
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm text-gray-500">Created At</p>
+                <p className="text-base font-medium text-gray-900">
+                  {new Date(lead.leadCreated).toLocaleString()}
                 </p>
               </div>
+
+              {lead.updatedAt && (
+                <div>
+                  <p className="text-sm text-gray-500">Last Updated</p>
+                  <p className="text-base font-medium text-gray-900">
+                    {new Date(lead.updatedAt).toLocaleString()}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Delete Lead</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this lead? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                disabled={deleteLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

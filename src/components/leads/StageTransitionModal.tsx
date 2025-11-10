@@ -1,428 +1,442 @@
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import {
-  XMarkIcon,
-  CheckIcon,
-  ExclamationCircleIcon,
-  ArrowPathIcon
-} from '@heroicons/react/24/outline';
-import type { Lead, LeadStage } from '../../types';
-import { Modal, Button, Input, Select } from '../ui';
+import { XMarkIcon, DocumentArrowUpIcon } from '@heroicons/react/24/outline';
 
 interface StageTransitionModalProps {
-  lead: Lead;
-  targetStage: LeadStage;
+  leadId: string;
+  leadTitle: string;
+  currentStage: string;
+  targetStage: string;
+  missingFields: string[];
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (updatedData: Partial<Lead>) => void;
-  missingFields: string[];
+  onConfirm: (formData: any) => Promise<void>;
 }
 
-const STAGE_REQUIREMENTS = {
-  lead: {
-    title: 'Lead/Qualified Stage',
-    description: 'Basic lead information',
-    fields: ['title', 'contactPerson', 'organization']
-  },
-  opportunity: {
-    title: 'Move to Opportunity',
-    description: 'Please fill in the required fields to move this lead to Opportunity stage',
-    fields: ['partNumber', 'quantity', 'region']
-  },
-  quotation_received: {
-    title: 'Move to Quotation Received',
-    description: 'No additional fields required - quotation will be created automatically',
-    fields: []
-  },
-  quotation_shared: {
-    title: 'Move to Quotation Shared',
-    description: 'Please fill in the deal details to share quotation with customer',
-    fields: ['value', 'grossMargin', 'dealProbability', 'expectedClosureDate', 'priceToWin']
-  },
-  negotiation_started: {
-    title: 'Move to Negotiation',
-    description: 'Please provide negotiation details',
-    fields: ['poDocument', 'invoiceDocument']
-  },
-  po_received: {
-    title: 'Move to PO Received',
-    description: 'Please provide shipping and testing details',
-    fields: ['awbNumber', 'leadTimeToLab', 'testingTime', 'readyToShip']
-  },
-  parts_delivered: {
-    title: 'Move to Parts Delivered',
-    description: 'Confirm delivery details',
-    fields: ['awbNumber']
-  }
-};
-
-const REGIONS = ['APAC', 'Americas', 'Europe', 'Middle East', 'Africa'];
-
 export const StageTransitionModal: React.FC<StageTransitionModalProps> = ({
-  lead,
+  leadId,
+  leadTitle,
+  currentStage,
   targetStage,
+  missingFields,
   isOpen,
   onClose,
   onConfirm,
-  missingFields
 }) => {
-  const [isSaving, setIsSaving] = useState(false);
-  const stageInfo = STAGE_REQUIREMENTS[targetStage];
+  const [formData, setFormData] = useState<any>({});
+  const [files, setFiles] = useState<{ [key: string]: File }>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm({
-    defaultValues: {
-      // Opportunity fields
-      partNumber: lead.partNumber || '',
-      quantity: lead.quantity || 0,
-      region: lead.region || '',
+  if (!isOpen) return null;
 
-      // Quotation shared fields
-      value: lead.value || 0,
-      grossMargin: lead.grossMargin || 0,
-      dealProbability: lead.dealProbability || 0,
-      expectedClosureDate: lead.expectedClosureDate || '',
-      priceToWin: lead.priceToWin || 0,
+  const getStageDisplayName = (stage: string) => {
+    const names: Record<string, string> = {
+      'OPPORTUNITY': 'Opportunity',
+      'QUOTATION_RECEIVED_FROM_SUPPLIER': 'Quotation Received from Supplier',
+      'QUOTATION_SHARED_WITH_CUSTOMER': 'Quotation Shared with Customer',
+      'NEGOTIATION_STARTED': 'Negotiation Started',
+      'PO_RECEIVED': 'PO Received',
+      'PARTS_DELIVERED': 'Parts Delivered'
+    };
+    return names[stage] || stage;
+  };
 
-      // Negotiation fields
-      poDocument: lead.poDocument || '',
-      invoiceDocument: lead.invoiceDocument || '',
-      specialTerms: lead.specialTerms || '',
-      customerRequest: lead.customerRequest || '',
-      dhlFedexAccount: lead.dhlFedexAccount || '',
+  const handleInputChange = (field: string, value: any) => {
+    setFormData((prev: any) => ({ ...prev, [field]: value }));
+  };
 
-      // PO Received fields
-      awbNumber: lead.awbNumber || '',
-      leadTimeToLab: lead.leadTimeToLab || 0,
-      testingTime: lead.testingTime || 0,
-      readyToShip: lead.readyToShip || 0,
+  const handleFileChange = (field: string, file: File | null) => {
+    if (file) {
+      setFiles((prev) => ({ ...prev, [field]: file }));
+      setFormData((prev: any) => ({ ...prev, [field]: file }));
     }
-  });
+  };
 
-  const onSubmit = async (data: any) => {
-    setIsSaving(true);
-
-    // Filter only the fields that were actually filled or are required for this stage
-    const updatedData: Partial<Lead> = {};
-    Object.keys(data).forEach(key => {
-      const value = data[key];
-      // Include if: not empty string, not zero (unless it's a valid zero), not null
-      if (value !== '' && value !== null && !(typeof value === 'number' && value === 0 && !stageInfo.fields.includes(key as keyof Lead))) {
-        (updatedData as any)[key] = value;
-      }
-    });
-
-    console.log('📝 Form submitted with data:', updatedData);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
     try {
-      await onConfirm(updatedData);
-    } catch (error) {
-      console.error('❌ Error in form submit:', error);
+      // Merge files into formData
+      const submitData = { ...formData, ...files };
+      await onConfirm(submitData);
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to move lead to next stage');
     } finally {
-      setIsSaving(false);
+      setLoading(false);
     }
   };
 
-  const renderFieldsByStage = () => {
-    switch (targetStage) {
-      case 'lead':
-        return (
-          <div className="text-sm text-gray-600">
-            <p>This is the initial stage. All required fields are already filled.</p>
-          </div>
-        );
-
-      case 'opportunity':
-        return (
-          <div className="space-y-4">
-            <Input
-              label="Part Number"
-              {...register('partNumber', { required: 'Part number is required' })}
-              error={errors.partNumber?.message}
-              placeholder="e.g., MAX3040EWE+"
+  const renderFieldInput = (field: string) => {
+    // Opportunity fields
+    if (targetStage === 'OPPORTUNITY') {
+      switch (field) {
+        case 'partNumber':
+          return (
+            <input
+              type="text"
+              value={formData.partNumber || ''}
+              onChange={(e) => handleInputChange('partNumber', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g., PN-45892-A"
+              required
             />
-            <Input
-              label="Quantity"
+          );
+        case 'quantity':
+          return (
+            <input
               type="number"
-              {...register('quantity', {
-                required: 'Quantity is required',
-                valueAsNumber: true,
-                min: { value: 1, message: 'Quantity must be at least 1' }
-              })}
-              error={errors.quantity?.message}
-              placeholder="e.g., 1000"
+              value={formData.quantity || ''}
+              onChange={(e) => handleInputChange('quantity', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g., 150"
+              required
             />
-            <Select
-              label="Region"
-              options={REGIONS.map(r => ({ value: r, label: r }))}
-              {...register('region', { required: 'Region is required' })}
-              error={errors.region?.message}
-              placeholder="Select region"
+          );
+        case 'regionCountry':
+          return (
+            <input
+              type="text"
+              value={formData.regionCountry || ''}
+              onChange={(e) => handleInputChange('regionCountry', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g., Germany"
+              required
             />
-          </div>
-        );
+          );
+      }
+    }
 
-      case 'quotation_received':
-        return (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              ✓ No additional fields required. The quotation record will be created automatically based on the opportunity data.
-            </p>
-          </div>
-        );
-
-      case 'quotation_shared':
-        return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Deal Value"
-                type="number"
-                step="0.01"
-                {...register('value', {
-                  required: 'Deal value is required',
-                  valueAsNumber: true,
-                  min: { value: 0.01, message: 'Value must be positive' }
-                })}
-                error={errors.value?.message}
-                placeholder="0.00"
-              />
-              <Input
-                label="Gross Margin (%)"
-                type="number"
-                step="0.01"
-                {...register('grossMargin', {
-                  required: 'Gross margin is required',
-                  valueAsNumber: true,
-                  min: { value: 0, message: 'Must be positive' },
-                  max: { value: 100, message: 'Cannot exceed 100%' }
-                })}
-                error={errors.grossMargin?.message}
-                placeholder="0.00"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Deal Probability (%)"
-                type="number"
-                {...register('dealProbability', {
-                  required: 'Deal probability is required',
-                  valueAsNumber: true,
-                  min: { value: 0, message: 'Must be between 0-100' },
-                  max: { value: 100, message: 'Must be between 0-100' }
-                })}
-                error={errors.dealProbability?.message}
-                placeholder="0-100"
-              />
-              <Input
-                label="Expected Closure Date"
-                type="date"
-                {...register('expectedClosureDate', { required: 'Expected closure date is required' })}
-                error={errors.expectedClosureDate?.message}
-              />
-            </div>
-            <Input
-              label="Price to Win Order"
+    // Quotation Supplier fields
+    if (targetStage === 'QUOTATION_RECEIVED_FROM_SUPPLIER') {
+      switch (field) {
+        case 'partNumber':
+          return (
+            <input
+              type="text"
+              value={formData.partNumber || ''}
+              onChange={(e) => handleInputChange('partNumber', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          );
+        case 'supplierName':
+          return (
+            <input
+              type="text"
+              value={formData.supplierName || ''}
+              onChange={(e) => handleInputChange('supplierName', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          );
+        case 'manufacturer':
+          return (
+            <input
+              type="text"
+              value={formData.manufacturer || ''}
+              onChange={(e) => handleInputChange('manufacturer', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          );
+        case 'quantity':
+          return (
+            <input
+              type="number"
+              value={formData.quantity || ''}
+              onChange={(e) => handleInputChange('quantity', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          );
+        case 'amount':
+          return (
+            <input
               type="number"
               step="0.01"
-              {...register('priceToWin', {
-                required: 'Price to win is required',
-                valueAsNumber: true,
-                min: { value: 0.01, message: 'Must be positive' }
-              })}
-              error={errors.priceToWin?.message}
-              placeholder="0.00"
+              value={formData.amount || ''}
+              onChange={(e) => handleInputChange('amount', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
             />
-          </div>
-        );
-
-      case 'negotiation_started':
-        return (
-          <div className="space-y-4">
-            <Input
-              label="PO Document URL"
-              {...register('poDocument', { required: 'PO document is required' })}
-              error={errors.poDocument?.message}
-              placeholder="https://example.com/po123.pdf"
+          );
+        case 'testingType':
+          return (
+            <input
+              type="text"
+              value={formData.testingType || ''}
+              onChange={(e) => handleInputChange('testingType', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g., Electrical"
+              required
             />
-            <Input
-              label="Invoice Document URL"
-              {...register('invoiceDocument', { required: 'Invoice document is required' })}
-              error={errors.invoiceDocument?.message}
-              placeholder="https://example.com/invoice123.pdf"
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Customer Request (Optional)
-              </label>
-              <textarea
-                {...register('customerRequest')}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter customer requests..."
-              />
-            </div>
-            <Input
-              label="DHL/FedEx Account Number (Optional)"
-              {...register('dhlFedexAccount')}
-              placeholder="DHL1234567"
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Special Terms & Conditions (Optional)
-              </label>
-              <textarea
-                {...register('specialTerms')}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter any special terms..."
-              />
-            </div>
-          </div>
-        );
-
-      case 'po_received':
-        return (
-          <div className="space-y-4">
-            <Input
-              label="AWB Number"
-              {...register('awbNumber', { required: 'AWB number is required' })}
-              error={errors.awbNumber?.message}
-              placeholder="AWB987654321"
-            />
-            <div className="grid grid-cols-3 gap-4">
-              <Input
-                label="Lead Time to Lab (days)"
-                type="number"
-                {...register('leadTimeToLab', {
-                  required: 'Lead time is required',
-                  valueAsNumber: true,
-                  min: { value: 0, message: 'Must be positive' }
-                })}
-                error={errors.leadTimeToLab?.message}
-                placeholder="3"
-              />
-              <Input
-                label="Testing Time (days)"
-                type="number"
-                {...register('testingTime', {
-                  required: 'Testing time is required',
-                  valueAsNumber: true,
-                  min: { value: 0, message: 'Must be positive' }
-                })}
-                error={errors.testingTime?.message}
-                placeholder="2"
-              />
-              <Input
-                label="Ready to Ship (days)"
-                type="number"
-                {...register('readyToShip', {
-                  required: 'Ready to ship time is required',
-                  valueAsNumber: true,
-                  min: { value: 0, message: 'Must be positive' }
-                })}
-                error={errors.readyToShip?.message}
-                placeholder="1"
-              />
-            </div>
-          </div>
-        );
-
-      case 'parts_delivered':
-        return (
-          <div className="space-y-4">
-            <Input
-              label="AWB Number"
-              {...register('awbNumber', { required: 'AWB number is required' })}
-              error={errors.awbNumber?.message}
-              placeholder="AWB987654321"
-            />
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <p className="text-sm text-green-800 flex items-center gap-2">
-                <CheckIcon className="w-5 h-5" />
-                This is the final stage. Once moved, the deal will be marked as delivered.
-              </p>
-            </div>
-          </div>
-        );
-
-      default:
-        return (
-          <div className="text-sm text-gray-500">
-            No additional fields required for this stage.
-          </div>
-        );
+          );
+      }
     }
+
+    // Quotation Customer fields
+    if (targetStage === 'QUOTATION_SHARED_WITH_CUSTOMER') {
+      switch (field) {
+        case 'model':
+        case 'brand':
+        case 'des':
+        case 'coo':
+        case 'dc':
+        case 'quote':
+        case 'warranty':
+        case 'leadTime':
+          return (
+            <input
+              type="text"
+              value={formData[field] || ''}
+              onChange={(e) => handleInputChange(field, e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          );
+        case 'qty':
+          return (
+            <input
+              type="number"
+              value={formData.qty || ''}
+              onChange={(e) => handleInputChange('qty', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          );
+        case 'dealValue':
+        case 'totalValue':
+        case 'grossMargin':
+          return (
+            <input
+              type="number"
+              step="0.01"
+              value={formData[field] || ''}
+              onChange={(e) => handleInputChange(field, e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          );
+      }
+    }
+
+    // PO Received fields
+    if (targetStage === 'PO_RECEIVED') {
+      switch (field) {
+        case 'poDocument':
+          return (
+            <div>
+              <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-500">
+                <DocumentArrowUpIcon className="w-6 h-6 mr-2 text-gray-400" />
+                <span className="text-sm text-gray-600">
+                  {files.poDocument ? files.poDocument.name : 'Upload PO Document'}
+                </span>
+                <input
+                  type="file"
+                  onChange={(e) => handleFileChange('poDocument', e.target.files?.[0] || null)}
+                  className="hidden"
+                  required
+                />
+              </label>
+            </div>
+          );
+        case 'specialTermsAndConditions':
+        case 'dhlFedexAccountNumber':
+          return (
+            <input
+              type="text"
+              value={formData[field] || ''}
+              onChange={(e) => handleInputChange(field, e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          );
+      }
+    }
+
+    // Parts Delivered fields
+    if (targetStage === 'PARTS_DELIVERED') {
+      switch (field) {
+        case 'model':
+        case 'dc':
+        case 'leadTime':
+          return (
+            <input
+              type="text"
+              value={formData[field] || ''}
+              onChange={(e) => handleInputChange(field, e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          );
+        case 'qty':
+          return (
+            <input
+              type="number"
+              value={formData.qty || ''}
+              onChange={(e) => handleInputChange('qty', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          );
+        case 'pricePerUnit':
+          return (
+            <input
+              type="number"
+              step="0.01"
+              value={formData.pricePerUnit || ''}
+              onChange={(e) => handleInputChange('pricePerUnit', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          );
+      }
+    }
+
+    // Default text input
+    return (
+      <input
+        type="text"
+        value={formData[field] || ''}
+        onChange={(e) => handleInputChange(field, e.target.value)}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+        required
+      />
+    );
   };
 
-  // Check if stage requires no fields or all fields are already filled
-  const hasNoRequiredFields = stageInfo.fields.length === 0;
-  const canProceedDirectly = hasNoRequiredFields && missingFields.length === 0;
+  const getFieldLabel = (field: string) => {
+    const labels: Record<string, string> = {
+      partNumber: 'Part Number',
+      quantity: 'Quantity',
+      regionCountry: 'Region/Country',
+      supplierName: 'Supplier Name',
+      manufacturer: 'Manufacturer',
+      amount: 'Amount',
+      testingType: 'Testing Type',
+      model: 'Model',
+      brand: 'Brand',
+      des: 'Description',
+      coo: 'Country of Origin',
+      dc: 'Date Code',
+      qty: 'Quantity',
+      quote: 'Quote Number',
+      warranty: 'Warranty',
+      leadTime: 'Lead Time',
+      dealValue: 'Deal Value',
+      totalValue: 'Total Value',
+      grossMargin: 'Gross Margin',
+      poDocument: 'PO Document',
+      specialTermsAndConditions: 'Special Terms & Conditions',
+      dhlFedexAccountNumber: 'DHL/FedEx Account Number',
+      pricePerUnit: 'Price Per Unit'
+    };
+    return labels[field] || field.replace(/([A-Z])/g, ' $1').trim();
+  };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={stageInfo.title} size="lg">
-      <div className="space-y-4">
-        {/* Info Banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-          <ExclamationCircleIcon className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-blue-900">{stageInfo.description}</p>
-            {missingFields.length > 0 && (
-              <p className="text-xs text-blue-700 mt-1">
-                Missing fields: <span className="font-semibold">{missingFields.join(', ')}</span>
-              </p>
-            )}
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Move to {getStageDisplayName(targetStage)}
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">{leadTitle}</p>
           </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <XMarkIcon className="w-6 h-6" />
+          </button>
         </div>
 
-        {/* ADD THIS: Dependency Check Warning */}
-        {targetStage === 'quotation_shared' && !lead.quotationSupplierId && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
-            <ExclamationCircleIcon className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-yellow-900">
-                ⚠️ Warning: Missing Quotation Supplier ID
-              </p>
-              <p className="text-xs text-yellow-700 mt-1">
-                This lead doesn't have a supplier quotation record. Please ensure the lead went through "Quotation Received" stage first.
-              </p>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              {error}
             </div>
+          )}
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-blue-800">
+              Please provide the following information to move this lead to <strong>{getStageDisplayName(targetStage)}</strong>
+            </p>
           </div>
-        )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {renderFieldsByStage()}
+          <div className="space-y-4">
+            {missingFields.map((field) => (
+              <div key={field}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {getFieldLabel(field)} <span className="text-red-500">*</span>
+                </label>
+                {renderFieldInput(field)}
+              </div>
+            ))}
 
-          {/* Footer */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-            <Button
+            {/* Optional fields */}
+            {(targetStage === 'QUOTATION_RECEIVED_FROM_SUPPLIER' || 
+              targetStage === 'QUOTATION_SHARED_WITH_CUSTOMER' ||
+              targetStage === 'NEGOTIATION_STARTED' ||
+              targetStage === 'PO_RECEIVED' ||
+              targetStage === 'PARTS_DELIVERED') && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes (Optional)
+                  </label>
+                  <textarea
+                    value={formData.notesText || ''}
+                    onChange={(e) => handleInputChange('notesText', e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Add any additional notes..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Attach File (Optional)
+                  </label>
+                  <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-500">
+                    <DocumentArrowUpIcon className="w-6 h-6 mr-2 text-gray-400" />
+                    <span className="text-sm text-gray-600">
+                      {files.notesFile ? files.notesFile.name : 'Upload supporting document'}
+                    </span>
+                    <input
+                      type="file"
+                      onChange={(e) => handleFileChange('notesFile', e.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-6 border-t">
+            <button
               type="button"
-              variant="secondary"
               onClick={onClose}
-              disabled={isSaving}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              disabled={loading}
             >
               Cancel
-            </Button>
-            <Button type="submit" disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
-                  Moving...
-                </>
-              ) : (
-                <>
-                  <CheckIcon className="h-4 w-4 mr-2" />
-                  {canProceedDirectly ? 'Confirm Move' : 'Save & Move'}
-                </>
-              )}
-            </Button>
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              disabled={loading}
+            >
+              {loading ? 'Moving...' : `Move to ${getStageDisplayName(targetStage)}`}
+            </button>
           </div>
         </form>
       </div>
-    </Modal>
+    </div>
   );
 };

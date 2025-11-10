@@ -3,35 +3,92 @@ import { DndContext, DragOverlay, closestCorners, PointerSensor, useSensor, useS
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  ExclamationCircleIcon,
   CheckCircleIcon,
   CurrencyDollarIcon,
   UserIcon,
-  CubeIcon,
-  MapPinIcon,
   BuildingOffice2Icon,
   ArrowPathIcon,
   PlusIcon,
-  ListBulletIcon
+  ListBulletIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
-import { leadStore } from '../../stores/leadStore';
-import { authStore } from '../../stores/authStore';
-import { userStore } from '../../stores/userStore';
 import { leadService } from '../../lib/leadService';
 import { kanbanService } from '../../lib/kanbanService';
-import { LoadingSpinner, Button } from '../../components/ui';
-import { LeadDetailModal, StageTransitionModal } from '../../components/leads';
-import type { Lead, LeadStage, User as UserType } from '../../types';
+import type { LeadStage } from '../../types';
+import { StageTransitionModal } from '../../components/leads/StageTransitionModal';
 
-const STAGES = [
-  { id: 'lead' as LeadStage, name: 'Lead/Qualified', color: 'bg-gray-500' },
-  { id: 'opportunity' as LeadStage, name: 'Opportunity', color: 'bg-blue-500' },
-  { id: 'quotation_received' as LeadStage, name: 'Quotation Received', color: 'bg-purple-500' },
-  { id: 'quotation_shared' as LeadStage, name: 'Quotation Shared', color: 'bg-yellow-500' },
-  { id: 'negotiation_started' as LeadStage, name: 'Negotiations Started', color: 'bg-orange-500' },
-  { id: 'po_received' as LeadStage, name: 'PO Received', color: 'bg-green-500' },
-  { id: 'parts_delivered' as LeadStage, name: 'Parts Delivered', color: 'bg-teal-500' }
+// Mock mode toggle
+const USE_MOCK_DATA = true;
+
+const STAGES: { id: Stage; name: string; color: string }[] = [
+  { id: 'LEAD', name: 'Lead', color: 'bg-gray-500' },
+  { id: 'OPPORTUNITY', name: 'Opportunity', color: 'bg-blue-500' },
+  { id: 'QUOTATION_RECEIVED_FROM_SUPPLIER', name: 'Quotation Received', color: 'bg-purple-500' },
+  { id: 'QUOTATION_SHARED_WITH_CUSTOMER', name: 'Quotation Shared', color: 'bg-yellow-500' },
+  { id: 'NEGOTIATION_STARTED', name: 'Negotiations', color: 'bg-orange-500' },
+  { id: 'PO_RECEIVED', name: 'PO Received', color: 'bg-green-500' },
+  { id: 'PARTS_DELIVERED', name: 'Parts Delivered', color: 'bg-teal-500' }
+];
+
+interface Lead {
+  id: string;
+  title: string;
+  contactPerson: string;
+  organization: string;
+  value?: number;
+  currency?: string;
+  label: string;
+  stage: Stage;
+  owner?: string;
+}
+
+// Mock leads data
+const mockLeads: Lead[] = [
+  {
+    id: '1',
+    title: 'RP509Z001D-E2-F 10000pcs',
+    contactPerson: 'John Smith',
+    organization: 'TechCorp Industries',
+    value: 15000,
+    currency: 'USD',
+    label: 'WARM',
+    stage: 'LEAD',
+    owner: 'Kaushik Iyer'
+  },
+  {
+    id: '2',
+    title: 'XPC8240LZU200E 1000pcs',
+    contactPerson: 'Sarah Johnson',
+    organization: 'MegaSystems Ltd',
+    value: 8500,
+    currency: 'USD',
+    label: 'WARM',
+    stage: 'LEAD',
+    owner: 'Kaushik Iyer'
+  },
+  {
+    id: '3',
+    title: 'MB2011SD3G01-CA 2pcs',
+    contactPerson: 'Emily Davis',
+    organization: 'Global Electronics Inc',
+    value: 25000,
+    currency: 'USD',
+    label: 'HOT',
+    stage: 'OPPORTUNITY',
+    owner: 'Kaushik Iyer'
+  },
+  {
+    id: '4',
+    title: 'P1016NXN5FFB 453pcs',
+    contactPerson: 'David Wilson',
+    organization: 'Quantum Systems',
+    value: 18900,
+    currency: 'USD',
+    label: 'HOT',
+    stage: 'QUOTATION_RECEIVED_FROM_SUPPLIER',
+    owner: 'Priya Patel'
+  }
 ];
 
 interface LeadCardProps {
@@ -50,27 +107,13 @@ function LeadCard({ lead, onClick }: LeadCardProps) {
     opacity: isDragging ? 0.5 : 1
   };
 
-  const getValidationStatus = (stage: LeadStage) => {
-    const result = kanbanService.validateStageTransition(lead, stage);
-    return {
-      isValid: result.isValid,
-      missingFields: result.missingFields,
-      error: result.error
-    };
-  };
-
-  const currentStage = (lead.stage || 'lead') as LeadStage;
-  const { isValid, missingFields } = getValidationStatus(currentStage);
-
   const getLabelColor = (label: string) => {
     const colors: Record<string, string> = {
-      hot: 'bg-red-100 text-red-700 border-red-200',
-      warm: 'bg-orange-100 text-orange-700 border-orange-200',
-      cold: 'bg-blue-100 text-blue-700 border-blue-200',
-      urgent: 'bg-pink-100 text-pink-700 border-pink-200',
-      priority: 'bg-purple-100 text-purple-700 border-purple-200'
+      HOT: 'bg-red-100 text-red-700 border-red-200',
+      WARM: 'bg-orange-100 text-orange-700 border-orange-200',
+      COLD: 'bg-blue-100 text-blue-700 border-blue-200',
     };
-    return colors[label.toLowerCase()] || 'bg-gray-100 text-gray-700 border-gray-200';
+    return colors[label] || 'bg-gray-100 text-gray-700 border-gray-200';
   };
 
   return (
@@ -87,19 +130,7 @@ function LeadCard({ lead, onClick }: LeadCardProps) {
     >
       <div className="flex items-start justify-between mb-2">
         <h3 className="font-semibold text-gray-900 text-sm flex-1 leading-tight pr-2">{lead.title}</h3>
-        <div
-          className="flex-shrink-0"
-          title={isValid
-            ? 'All required fields filled ✓'
-            : `⚠️ Missing fields for this stage: ${missingFields.join(', ')}`
-          }
-        >
-          {isValid ? (
-            <CheckCircleIcon className="w-5 h-5 text-green-500" />
-          ) : (
-            <ExclamationCircleIcon className="w-5 h-5 text-yellow-500" />
-          )}
-        </div>
+        <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
       </div>
 
       <div className="space-y-2 text-xs text-gray-600">
@@ -114,47 +145,22 @@ function LeadCard({ lead, onClick }: LeadCardProps) {
         </div>
       </div>
 
-      {lead.labels && lead.labels.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-3">
-          {lead.labels.slice(0, 2).map((label, idx) => (
-            <span
-              key={idx}
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getLabelColor(label)}`}
-            >
-              {label.toUpperCase()}
-            </span>
-          ))}
-          {lead.labels.length > 2 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-gray-100 text-gray-700 border-gray-200">
-              +{lead.labels.length - 2}
-            </span>
-          )}
+      {lead.label && (
+        <div className="mt-3">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getLabelColor(lead.label)}`}>
+            {lead.label}
+          </span>
         </div>
       )}
 
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-        <div className="flex items-center gap-3 text-xs">
-          {lead.value > 0 && (
-            <div className="flex items-center gap-1 font-medium text-gray-900">
-              <CurrencyDollarIcon className="w-3.5 h-3.5" />
-              <span>{lead.value.toLocaleString()} {lead.currencyType}</span>
-            </div>
-          )}
-          {lead.quantity && (
-            <div className="flex items-center gap-1 text-gray-500">
-              <CubeIcon className="w-3.5 h-3.5" />
-              <span>{lead.quantity}</span>
-            </div>
-          )}
-        </div>
-
-        {lead.country && (
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <MapPinIcon className="w-3.5 h-3.5" />
-            <span>{lead.country}</span>
+      {lead.value && (
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center gap-1 text-xs font-medium text-gray-900">
+            <CurrencyDollarIcon className="w-3.5 h-3.5" />
+            <span>{lead.value.toLocaleString()} {lead.currency}</span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -169,12 +175,6 @@ function KanbanColumn({ stage, leads, onLeadClick }: KanbanColumnProps) {
   const { setNodeRef } = useSortable({ id: stage.id });
 
   const totalValue = leads.reduce((sum, lead) => sum + (lead.value || 0), 0);
-  const currencies = [...new Set(leads.map(l => l.currencyType).filter(Boolean))];
-
-  const leadsWithIssues = leads.filter(lead => {
-    const validation = kanbanService.validateStageTransition(lead, stage.id);
-    return !validation.isValid;
-  }).length;
 
   return (
     <div className="flex-shrink-0 w-80 bg-gray-50 rounded-lg p-4">
@@ -192,14 +192,6 @@ function KanbanColumn({ stage, leads, onLeadClick }: KanbanColumnProps) {
           <div className="flex items-center gap-1 text-xs font-medium text-gray-700">
             <CurrencyDollarIcon className="w-3.5 h-3.5" />
             <span>${totalValue.toLocaleString()}</span>
-            {currencies.length === 1 && <span className="text-gray-500">{currencies[0]}</span>}
-          </div>
-        )}
-
-        {leadsWithIssues > 0 && (
-          <div className="mt-2 flex items-center gap-1.5 text-xs text-yellow-700 bg-yellow-50 px-2 py-1.5 rounded border border-yellow-200">
-            <ExclamationCircleIcon className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>{leadsWithIssues} need{leadsWithIssues === 1 ? 's' : ''} attention</span>
           </div>
         )}
       </div>
@@ -211,7 +203,6 @@ function KanbanColumn({ stage, leads, onLeadClick }: KanbanColumnProps) {
           ))}
           {leads.length === 0 && (
             <div className="text-center py-12 text-gray-400 text-sm">
-              <CubeIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p>Drop leads here</p>
             </div>
           )}
@@ -223,19 +214,16 @@ function KanbanColumn({ stage, leads, onLeadClick }: KanbanColumnProps) {
 
 export const KanbanPage: React.FC = () => {
   const navigate = useNavigate();
-  const { leads, isLoading, setLoading, updateLead, setLeads } = leadStore();
-  const { user } = authStore();
-  const { users, setUsers } = userStore();
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [localLeads, setLocalLeads] = useState<Lead[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [pendingMove, setPendingMove] = useState<{
     lead: Lead;
-    targetStage: LeadStage;
+    targetStage: Stage;
     missingFields: string[];
   } | null>(null);
-  
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -246,24 +234,19 @@ export const KanbanPage: React.FC = () => {
 
   useEffect(() => {
     loadLeads();
-    loadUsers();
   }, []);
-
-  useEffect(() => {
-    // ✅ Enrich leads with cached stage data from localStorage
-    const enrichedLeads = kanbanService.enrichLeadsWithStageData(leads);
-    setLocalLeads(enrichedLeads);
-    console.log('📦 Enriched', enrichedLeads.length, 'leads with cached stage data');
-  }, [leads]);
 
   const loadLeads = async () => {
     try {
       setLoading(true);
-      const response = await leadService.getAllLeads({
-        page: 1,
-        size: 1000,
-      });
-      setLeads(response);
+      
+      if (USE_MOCK_DATA) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setLeads(mockLeads);
+      } else {
+        const response = await leadService.getAllLeads({ page: 1, size: 1000 });
+        setLeads(response.content || response);
+      }
     } catch (error) {
       console.error('Failed to load leads:', error);
     } finally {
@@ -271,49 +254,8 @@ export const KanbanPage: React.FC = () => {
     }
   };
 
-  const loadUsers = async () => {
-    if (users && users.length > 0) return;
-
-    try {
-      const { authService } = await import('../../lib/authService');
-      const response = await authService.getUsers(0, 100);
-      setUsers(response);
-    } catch (error) {
-      console.error('Failed to load users:', error);
-    }
-  };
-
   const handleDragStart = (event: any) => {
     setActiveId(event.active.id);
-  };
-
-  const handleDragOver = (event: any) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeId = active.id;
-    const overId = over.id;
-
-    const activeStage = STAGES.find(s => s.id === activeId);
-    const overStage = STAGES.find(s => s.id === overId);
-
-    if (activeStage || overStage) return;
-
-    const activeLead = localLeads.find(l => l.id === activeId);
-    const overLead = localLeads.find(l => l.id === overId);
-
-    if (!activeLead) return;
-
-    const activeLeadStage = activeLead.stage || 'lead';
-    const overLeadStage = overLead?.stage || over.id;
-
-    if (activeLeadStage !== overLeadStage) {
-      setLocalLeads(prev => prev.map(lead =>
-        lead.id === activeId
-          ? { ...lead, stage: overLeadStage as LeadStage }
-          : lead
-      ));
-    }
   };
 
   const handleDragEnd = async (event: any) => {
@@ -325,223 +267,204 @@ export const KanbanPage: React.FC = () => {
     const activeId = active.id;
     const overId = over.id;
 
-    const activeLead = localLeads.find(l => l.id === activeId);
-    const overStage = STAGES.find(s => s.id === overId);
+    // Find the dragged lead
+    const activeLead = leads.find(l => l.id === activeId);
+    if (!activeLead) return;
 
-    if (activeLead && overStage && activeLead.stage !== overStage.id) {
-      const newStage = overStage.id;
-
-      // ✅ Load cached stage IDs for this lead
-      const cached = kanbanService.loadLeadStageFromStore(activeLead.id);
-      const enrichedLead = { ...activeLead, ...cached };
-
-      console.log('🔍 Validating transition:', {
-        leadId: enrichedLead.id,
-        from: enrichedLead.stage,
-        to: newStage,
-        opportunityId: enrichedLead.opportunityId,
-        quotationSupplierId: enrichedLead.quotationSupplierId,
-        quotationCustomerId: enrichedLead.quotationCustomerId,
-      });
-
-      // Validate with enriched lead
-      const validation = kanbanService.validateStageTransition(enrichedLead, newStage);
-
-      if (!validation.isValid) {
-        if (validation.error) {
-          // Dependency missing - show error alert
-          alert(`Cannot move to ${overStage.name}\n\n${validation.error}`);
-          
-          // Revert optimistic update
-          setLocalLeads(prev => prev.map(l =>
-            l.id === activeLead.id
-              ? { ...l, stage: activeLead.stage }
-              : l
-          ));
-          return;
-        } else if (validation.missingFields.length > 0) {
-          // Fields missing - show form with enriched lead
-          console.log('⚠️ Missing fields:', validation.missingFields);
-          setPendingMove({
-            lead: enrichedLead,
-            targetStage: newStage,
-            missingFields: validation.missingFields
-          });
-          return;
-        }
+    // Determine target stage
+    let targetStage: Stage | null = null;
+    
+    // Check if dropped on a stage column
+    const targetStageObj = STAGES.find(s => s.id === overId);
+    if (targetStageObj) {
+      targetStage = targetStageObj.id;
+    } else {
+      // Dropped on another lead - get that lead's stage
+      const targetLead = leads.find(l => l.id === overId);
+      if (targetLead) {
+        targetStage = targetLead.stage;
       }
-
-      // Validation passed - proceed with move
-      await executeMove(enrichedLead, newStage);
     }
+
+    if (!targetStage || activeLead.stage === targetStage) return;
+
+    console.log('🎯 Attempting move:', {
+      lead: activeLead.title,
+      from: activeLead.stage,
+      to: targetStage
+    });
+
+    // Validate stage transition
+    const validation = kanbanService.validateStageTransition(activeLead.stage, targetStage);
+
+    if (!validation.isValid) {
+      if (validation.error) {
+        // Cannot move to this stage (skipping stages)
+        alert(validation.error);
+        return;
+      } else if (validation.missingFields.length > 0) {
+        // Need to fill in required fields
+        console.log('⚠️ Missing fields:', validation.missingFields);
+        
+        // Optimistically update UI
+        setLeads(prev => prev.map(l =>
+          l.id === activeLead.id ? { ...l, stage: targetStage } : l
+        ));
+
+        setPendingMove({
+          lead: activeLead,
+          targetStage: targetStage,
+          missingFields: validation.missingFields
+        });
+        return;
+      }
+    }
+
+    // Can move directly (validation passed)
+    await executeMove(activeLead, targetStage, {});
   };
 
-  const executeMove = async (lead: Lead, newStage: LeadStage, additionalData?: Partial<Lead>) => {
-    // Optimistic update
-    setLocalLeads(prev => prev.map(l =>
-      l.id === lead.id
-        ? { ...l, stage: newStage, ...additionalData }
-        : l
+  const executeMove = async (lead: Lead, targetStage: Stage, formData: any) => {
+    console.log('🚀 Executing move:', { leadId: lead.id, targetStage, formData });
+
+    // Optimistically update UI
+    setLeads(prev => prev.map(l =>
+      l.id === lead.id ? { ...l, stage: targetStage } : l
     ));
 
     try {
-      // Merge additional data with lead
-      const leadWithUpdates = { ...lead, ...additionalData };
-      
-      console.log('🚀 Executing move:', {
-        leadId: lead.id,
-        newStage,
-        hasOpportunityId: !!leadWithUpdates.opportunityId,
-        hasQuotationSupplierId: !!leadWithUpdates.quotationSupplierId,
-        hasQuotationCustomerId: !!leadWithUpdates.quotationCustomerId,
-      });
-      
-      // Call kanbanService which will create the stage-specific record and cache the result
-      const result = await kanbanService.moveLeadToStage(leadWithUpdates, newStage, user?.id || 'system');
-      
-      // Update the store
-      updateLead(lead.id, { ...result, ...additionalData });
-      
-      // Re-enrich localLeads with fresh cache
-      const cached = kanbanService.loadLeadStageFromStore(lead.id);
-      setLocalLeads(prev => prev.map(l =>
-        l.id === lead.id
-          ? { ...l, ...result, ...cached, ...additionalData }
-          : l
-      ));
-      
-      console.log(`✅ Lead ${lead.id} successfully moved to ${newStage}`);
+      if (USE_MOCK_DATA) {
+        // Mock delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('✅ Mock: Lead moved successfully');
+      } else {
+        // Real API call
+        await kanbanService.moveLeadToStage(lead.id, lead.stage, targetStage, formData);
+        console.log('✅ Lead moved successfully');
+      }
     } catch (error: any) {
-      console.error('❌ Failed to update lead stage:', error);
+      console.error('❌ Failed to move lead:', error);
       
       // Revert on error
-      setLocalLeads(prev => prev.map(l =>
-        l.id === lead.id
-          ? { ...l, stage: lead.stage }
-          : l
+      setLeads(prev => prev.map(l =>
+        l.id === lead.id ? { ...l, stage: lead.stage } : l
       ));
       
-      alert(error.message || 'Failed to update lead stage. Please try again.');
+      alert(error.message || 'Failed to move lead. Please try again.');
     }
   };
 
-  const handleConfirmMove = async (updatedData: Partial<Lead>) => {
+  const handleConfirmMove = async (formData: any) => {
     if (!pendingMove) return;
 
     try {
-      console.log('📝 User provided data for stage transition:', updatedData);
-      
-      // Don't update the lead via /leads API - just pass data to stage-specific APIs
-      await executeMove(
-        pendingMove.lead,
-        pendingMove.targetStage,
-        updatedData
-      );
-
+      await executeMove(pendingMove.lead, pendingMove.targetStage, formData);
       setPendingMove(null);
     } catch (error: any) {
       console.error('❌ Error in handleConfirmMove:', error);
-      alert(error.message || 'Failed to update lead');
       
       // Revert
-      setLocalLeads(prev => prev.map(l =>
-        l.id === pendingMove.lead.id
-          ? pendingMove.lead
-          : l
+      setLeads(prev => prev.map(l =>
+        l.id === pendingMove.lead.id ? pendingMove.lead : l
       ));
       
       setPendingMove(null);
+      throw error;
     }
   };
 
   const handleCancelMove = () => {
     if (pendingMove) {
       // Revert optimistic update
-      setLocalLeads(prev => prev.map(l =>
-        l.id === pendingMove.lead.id
-          ? { ...l, stage: pendingMove.lead.stage }
-          : l
+      setLeads(prev => prev.map(l =>
+        l.id === pendingMove.lead.id ? { ...l, stage: pendingMove.lead.stage } : l
       ));
     }
     setPendingMove(null);
   };
 
-  const getLeadsByStage = (stageId: LeadStage) => {
-    return localLeads.filter(lead => (lead.stage || 'lead') === stageId);
+  const getLeadsByStage = (stageId: Stage) => {
+    return leads.filter(lead => lead.stage === stageId);
   };
-
-  const activeLead = localLeads.find(l => l.id === activeId);
 
   const handleLeadClick = (lead: Lead) => {
-    setSelectedLead(lead);
-    setIsModalOpen(true);
+    navigate(`/leads/${lead.id}`);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedLead(null);
-  };
+  const activeLead = leads.find(l => l.id === activeId);
 
-  const getAssignedUser = (lead: Lead): UserType | undefined => {
-    if (!lead.assignedTo || !users) return undefined;
-    return users.find(u => u.id === lead.assignedTo);
-  };
-
-  if (isLoading && localLeads.length === 0) {
+  if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-gray-500">Loading deals...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="flex flex-col h-full overflow-hidden bg-gray-100">
+      {/* Mock Mode Banner */}
+      {USE_MOCK_DATA && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-2 flex items-center justify-between flex-shrink-0">
+          <span className="text-sm text-yellow-800">
+            🎭 <strong>Mock Mode:</strong> Using sample data. Drag & drop between stages to test.
+          </span>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+      <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-bold text-gray-900">Deals Pipeline</h1>
             <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              {localLeads.length} deals
+              {leads.length} deals
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <Button
-              variant="secondary"
-              size="sm"
+            <button
               onClick={() => navigate('/leads')}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
             >
-              <ListBulletIcon className="h-4 w-4 mr-2" />
-              List View
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
+              <ListBulletIcon className="h-4 w-4" />
+              <span>List View</span>
+            </button>
+            <button
               onClick={loadLeads}
-              disabled={isLoading}
+              disabled={loading}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
             >
-              <ArrowPathIcon className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            <Button onClick={() => navigate('/leads/create')}>
-              <PlusIcon className="h-4 w-4 mr-2" />
-              New Deal
-            </Button>
+              <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+            <button
+              onClick={() => navigate('/leads/create')}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center space-x-2"
+            >
+              <PlusIcon className="h-4 w-4" />
+              <span>New Deal</span>
+            </button>
           </div>
         </div>
       </div>
 
+      {/* Info Banner */}
+      <div className="bg-blue-50 border-b border-blue-200 px-6 py-3 flex items-center space-x-2 flex-shrink-0">
+        <ExclamationTriangleIcon className="w-5 h-5 text-blue-600" />
+        <p className="text-sm text-blue-800">
+          <strong>Note:</strong> You can only move leads to the next stage sequentially. Skipping stages is not allowed.
+        </p>
+      </div>
+
       {/* Kanban Board */}
-      <div className="p-6">
+      <div className="flex-1 overflow-hidden p-6">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-4 overflow-x-auto pb-4 h-full">
             {STAGES.map(stage => (
               <KanbanColumn
                 key={stage.id}
@@ -557,9 +480,9 @@ export const KanbanPage: React.FC = () => {
               <div className="bg-white p-4 rounded-lg shadow-2xl border-2 border-blue-400 w-80 rotate-2">
                 <h3 className="font-semibold text-gray-900 text-sm">{activeLead.title}</h3>
                 <p className="text-xs text-gray-600 mt-1">{activeLead.organization}</p>
-                {activeLead.value > 0 && (
+                {activeLead.value && (
                   <p className="text-xs font-medium text-gray-900 mt-2">
-                    ${activeLead.value.toLocaleString()} {activeLead.currencyType}
+                    ${activeLead.value.toLocaleString()} {activeLead.currency}
                   </p>
                 )}
               </div>
@@ -568,20 +491,12 @@ export const KanbanPage: React.FC = () => {
         </DndContext>
       </div>
 
-      {/* Lead Detail Modal */}
-      {selectedLead && (
-        <LeadDetailModal
-          lead={selectedLead}
-          assignedUser={getAssignedUser(selectedLead)}
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-        />
-      )}
-
       {/* Stage Transition Modal */}
       {pendingMove && (
         <StageTransitionModal
-          lead={pendingMove.lead}
+          leadId={pendingMove.lead.id}
+          leadTitle={pendingMove.lead.title}
+          currentStage={pendingMove.lead.stage}
           targetStage={pendingMove.targetStage}
           missingFields={pendingMove.missingFields}
           isOpen={true}

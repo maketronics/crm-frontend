@@ -1,11 +1,11 @@
 import { leadApiClient } from './leadApiClient';
-import type { 
-  Lead, 
-  CreateLeadRequest, 
-  LeadFilters, 
-  PaginatedResponse, 
-  LeadComment, 
-  CreateCommentRequest, 
+import type {
+  Lead,
+  CreateLeadRequest,
+  LeadFilters,
+  PaginatedResponse,
+  LeadComment,
+  CreateCommentRequest,
   AssignLeadRequest,
   LeadStage,
   UpdateLeadStageRequest,
@@ -15,6 +15,76 @@ import type {
 } from '../types';
 
 export const leadService = {
+  // Modified createLead to handle multipart/form-data
+  async createLead(data: CreateLeadRequest): Promise<Lead> {
+    console.log('leadService: Creating lead with data:', data);
+
+    // Create FormData for multipart/form-data
+    const formData = new FormData();
+
+    // Append all required fields
+    formData.append('contactPerson', data.contactPerson);
+    formData.append('organization', data.organization);
+    formData.append('title', data.title);
+    formData.append('currency', data.currency);
+    formData.append('label', data.label);
+    formData.append('owner', data.owner);
+    formData.append('sourceChannel', data.sourceChannel);
+    formData.append('sourceChannelId', data.sourceChannelId);
+    formData.append('sourceOrigin', data.sourceOrigin);
+    formData.append('phone', data.phone);
+    formData.append('name', data.name);
+
+    // Append optional fields only if they have values
+    if (data.value !== undefined && data.value !== null && data.value !== '') {
+      formData.append('value', data.value.toString());
+    }
+    if (data.expectedCloseDate) {
+      formData.append('expectedCloseDate', data.expectedCloseDate);
+    }
+    if (data.targetSegment) {
+      formData.append('targetSegment', data.targetSegment);
+    }
+    if (data.email) {
+      formData.append('email', data.email);
+    }
+    if (data.quotationLink) {
+      formData.append('quotationLink', data.quotationLink);
+    }
+    if (data.notesText) {
+      formData.append('notesText', data.notesText);
+    }
+    if (data.stage) {
+      formData.append('stage', data.stage);
+    }
+
+    // Append file if exists
+    if (data.notesFile) {
+      formData.append('notesFile', data.notesFile);
+      console.log('leadService: Attached file:', data.notesFile.name);
+    }
+
+    // Log FormData contents for debugging
+    console.log('leadService: FormData contents:');
+    for (const [key, value] of formData.entries()) {
+      console.log(`  ${key}:`, value);
+    }
+
+    try {
+      const result = await leadApiClient.post<Lead>('/leads', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      console.log('leadService: Lead created successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('leadService: Error creating lead:', error);
+      throw error;
+    }
+  },
+
   // Existing methods
   async getAllLeads(params?: {
     page?: number;
@@ -22,10 +92,10 @@ export const leadService = {
     filters?: LeadFilters;
   }): Promise<any> {
     const queryParams = new URLSearchParams();
-    
+
     if (params?.page !== undefined) queryParams.append('page', (params.page - 1).toString());
     if (params?.size) queryParams.append('size', params.size.toString());
-    
+
     if (params?.filters) {
       Object.entries(params.filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
@@ -47,22 +117,46 @@ export const leadService = {
     return leadApiClient.get<Lead>(`/leads/${id}`);
   },
 
-  async createLead(data: CreateLeadRequest): Promise<Lead> {
-    return leadApiClient.post<Lead>('/leads', data);
+  async updateLead(id: string, data: Partial<CreateLeadRequest>): Promise<Lead> {
+    console.log('📤 Updating lead:', id);
+    console.log('📤 Request body:', JSON.stringify(data, null, 2));
+
+    // Create FormData for update as well
+    const formData = new FormData();
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        if (value instanceof File) {
+          formData.append(key, value);
+        } else if (typeof value === 'object') {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, value.toString());
+        }
+      }
+    });
+
+    const result = await leadApiClient.put<Lead>(`/leads/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    console.log('✅ Update response:', result);
+    return result;
   },
 
- async updateLead(id: string, data: Partial<Lead>): Promise<Lead> {
-  console.log('📤 Updating lead:', id);
-  console.log('📤 Request body:', JSON.stringify(data, null, 2));
-  
-  const result = await leadApiClient.put<Lead>(`/leads/${id}`, data);
-  
-  console.log('✅ Update response:', result);
-  return result;
-},
+  async deleteLead(id: string): Promise<{ message: string }> {
+    console.log('🗑️ leadService: Deleting lead:', id);
 
-  async deleteLead(id: string): Promise<void> {
-    return leadApiClient.delete<void>(`/leads/${id}`);
+    try {
+      const result = await leadApiClient.delete<{ message: string }>(`/leads/${id}`);
+      console.log('✅ leadService: Delete response:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ leadService: Error deleting lead:', error);
+      throw error;
+    }
   },
 
   async assignLeadPatch(leadId: string, userId: string): Promise<Lead> {
@@ -122,7 +216,7 @@ export const leadService = {
 
     const requiredFields = validations[stage] || [];
     const missingFields: string[] = [];
-    
+
     requiredFields.forEach(field => {
       const value = lead[field];
       if (!value || (typeof value === 'number' && value <= 0)) {
@@ -151,7 +245,7 @@ export const leadService = {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('fileType', fileType);
-    
+
     return leadApiClient.post<{ fileUrl: string }>(
       `/leads/${leadId}/upload`,
       formData,
@@ -195,7 +289,7 @@ export const leadService = {
     images.forEach((image, index) => {
       formData.append(`images`, image);
     });
-    
+
     return leadApiClient.post<Lead>(
       `/leads/${leadId}/qc-images`,
       formData,
