@@ -7,6 +7,7 @@ export interface POReceivedNotes {
 
 export interface POReceived {
   id?: string;
+  leadId?: string;
   poDocument: string;
   specialTermsAndConditions: string;
   dhlFedexAccountNumber: string;
@@ -24,7 +25,7 @@ export interface CreatePOReceivedRequest {
 }
 
 export const poReceivedApi = {
-  create: async (data: CreatePOReceivedRequest): Promise<{ message: string }> => {
+  create: async (leadId: string, data: CreatePOReceivedRequest): Promise<{ message: string }> => {
     const formData = new FormData();
     formData.append('poDocument', data.poDocument);
     formData.append('specialTermsAndConditions', data.specialTermsAndConditions);
@@ -34,7 +35,7 @@ export const poReceivedApi = {
     if (data.notesFile) formData.append('notesFile', data.notesFile);
     if (data.stage) formData.append('stage', data.stage);
 
-    const response = await axiosInstance.post('/po-received', formData, {
+    const response = await axiosInstance.post(`/po-received/${leadId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
@@ -45,8 +46,8 @@ export const poReceivedApi = {
     return response.data;
   },
 
-  getById: async (id: string): Promise<POReceived> => {
-    const response = await axiosInstance.get(`/po-received/${id}`);
+  getByLeadId: async (leadId: string): Promise<POReceived> => {
+    const response = await axiosInstance.get(`/po-received/${leadId}`);
     return response.data;
   },
 

@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { XMarkIcon, DocumentArrowUpIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+
+type Stage = 'LEAD' | 'OPPORTUNITY' | 'QUOTATION_RECEIVED_FROM_SUPPLIER' | 
+  'QUOTATION_SHARED_WITH_CUSTOMER' | 'NEGOTIATION_STARTED' | 'PO_RECEIVED' | 'PARTS_DELIVERED';
 
 interface StageTransitionModalProps {
   leadId: string;
   leadTitle: string;
-  currentStage: string;
-  targetStage: string;
+  currentStage: Stage;
+  targetStage: Stage;
   missingFields: string[];
   isOpen: boolean;
   onClose: () => void;
@@ -23,419 +26,531 @@ export const StageTransitionModal: React.FC<StageTransitionModalProps> = ({
   onConfirm,
 }) => {
   const [formData, setFormData] = useState<any>({});
-  const [files, setFiles] = useState<{ [key: string]: File }>({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
 
   if (!isOpen) return null;
 
-  const getStageDisplayName = (stage: string) => {
-    const names: Record<string, string> = {
-      'OPPORTUNITY': 'Opportunity',
-      'QUOTATION_RECEIVED_FROM_SUPPLIER': 'Quotation Received from Supplier',
-      'QUOTATION_SHARED_WITH_CUSTOMER': 'Quotation Shared with Customer',
-      'NEGOTIATION_STARTED': 'Negotiation Started',
-      'PO_RECEIVED': 'PO Received',
-      'PARTS_DELIVERED': 'Parts Delivered'
-    };
-    return names[stage] || stage;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      // Add file to formData if present
+      const submitData = { ...formData };
+      if (file) {
+        submitData.file = file;
+      }
+      
+      await onConfirm(submitData);
+    } catch (error) {
+      console.error('Failed to move lead:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }));
   };
 
-  const handleFileChange = (field: string, file: File | null) => {
-    if (file) {
-      setFiles((prev) => ({ ...prev, [field]: file }));
-      setFormData((prev: any) => ({ ...prev, [field]: file }));
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Merge files into formData
-      const submitData = { ...formData, ...files };
-      await onConfirm(submitData);
-      onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to move lead to next stage');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderFieldInput = (field: string) => {
-    // Opportunity fields
-    if (targetStage === 'OPPORTUNITY') {
-      switch (field) {
-        case 'partNumber':
-          return (
-            <input
-              type="text"
-              value={formData.partNumber || ''}
-              onChange={(e) => handleInputChange('partNumber', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g., PN-45892-A"
-              required
-            />
-          );
-        case 'quantity':
-          return (
-            <input
-              type="number"
-              value={formData.quantity || ''}
-              onChange={(e) => handleInputChange('quantity', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g., 150"
-              required
-            />
-          );
-        case 'regionCountry':
-          return (
-            <input
-              type="text"
-              value={formData.regionCountry || ''}
-              onChange={(e) => handleInputChange('regionCountry', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g., Germany"
-              required
-            />
-          );
-      }
-    }
-
-    // Quotation Supplier fields
-    if (targetStage === 'QUOTATION_RECEIVED_FROM_SUPPLIER') {
-      switch (field) {
-        case 'partNumber':
-          return (
-            <input
-              type="text"
-              value={formData.partNumber || ''}
-              onChange={(e) => handleInputChange('partNumber', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-        case 'supplierName':
-          return (
-            <input
-              type="text"
-              value={formData.supplierName || ''}
-              onChange={(e) => handleInputChange('supplierName', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-        case 'manufacturer':
-          return (
-            <input
-              type="text"
-              value={formData.manufacturer || ''}
-              onChange={(e) => handleInputChange('manufacturer', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-        case 'quantity':
-          return (
-            <input
-              type="number"
-              value={formData.quantity || ''}
-              onChange={(e) => handleInputChange('quantity', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-        case 'amount':
-          return (
-            <input
-              type="number"
-              step="0.01"
-              value={formData.amount || ''}
-              onChange={(e) => handleInputChange('amount', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-        case 'testingType':
-          return (
-            <input
-              type="text"
-              value={formData.testingType || ''}
-              onChange={(e) => handleInputChange('testingType', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g., Electrical"
-              required
-            />
-          );
-      }
-    }
-
-    // Quotation Customer fields
-    if (targetStage === 'QUOTATION_SHARED_WITH_CUSTOMER') {
-      switch (field) {
-        case 'model':
-        case 'brand':
-        case 'des':
-        case 'coo':
-        case 'dc':
-        case 'quote':
-        case 'warranty':
-        case 'leadTime':
-          return (
-            <input
-              type="text"
-              value={formData[field] || ''}
-              onChange={(e) => handleInputChange(field, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-        case 'qty':
-          return (
-            <input
-              type="number"
-              value={formData.qty || ''}
-              onChange={(e) => handleInputChange('qty', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-        case 'dealValue':
-        case 'totalValue':
-        case 'grossMargin':
-          return (
-            <input
-              type="number"
-              step="0.01"
-              value={formData[field] || ''}
-              onChange={(e) => handleInputChange(field, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-      }
-    }
-
-    // PO Received fields
-    if (targetStage === 'PO_RECEIVED') {
-      switch (field) {
-        case 'poDocument':
-          return (
+  const renderFormFields = () => {
+    switch (targetStage) {
+      case 'OPPORTUNITY':
+        return (
+          <>
             <div>
-              <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-500">
-                <DocumentArrowUpIcon className="w-6 h-6 mr-2 text-gray-400" />
-                <span className="text-sm text-gray-600">
-                  {files.poDocument ? files.poDocument.name : 'Upload PO Document'}
-                </span>
-                <input
-                  type="file"
-                  onChange={(e) => handleFileChange('poDocument', e.target.files?.[0] || null)}
-                  className="hidden"
-                  required
-                />
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Part Number *
+              </label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.partNumber || ''}
+                onChange={(e) => handleInputChange('partNumber', e.target.value)}
+                placeholder="e.g., PN-45892-A"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Quantity *
+              </label>
+              <input
+                type="number"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.quantity || ''}
+                onChange={(e) => handleInputChange('quantity', parseFloat(e.target.value))}
+                placeholder="150"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Region/Country *
+              </label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.regionCountry || ''}
+                onChange={(e) => handleInputChange('regionCountry', e.target.value)}
+                placeholder="e.g., Germany"
+              />
+            </div>
+          </>
+        );
+
+      case 'QUOTATION_RECEIVED_FROM_SUPPLIER':
+        return (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Part Number *
+              </label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.partNumber || ''}
+                onChange={(e) => handleInputChange('partNumber', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Supplier Name *
+              </label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.supplierName || ''}
+                onChange={(e) => handleInputChange('supplierName', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Manufacturer *
+              </label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.manufacturer || ''}
+                onChange={(e) => handleInputChange('manufacturer', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Quantity *
+              </label>
+              <input
+                type="number"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.quantity || ''}
+                onChange={(e) => handleInputChange('quantity', parseInt(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Amount *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.amount || ''}
+                onChange={(e) => handleInputChange('amount', parseFloat(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Testing Type *
+              </label>
+              <select
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.testingType || ''}
+                onChange={(e) => handleInputChange('testingType', e.target.value)}
+              >
+                <option value="">Select testing type</option>
+                <option value="Electrical">Electrical</option>
+                <option value="Mechanical">Mechanical</option>
+                <option value="Visual">Visual</option>
+                <option value="Functional">Functional</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Estimated Date
+              </label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.estimatedDate || ''}
+                onChange={(e) => handleInputChange('estimatedDate', e.target.value)}
+              />
+            </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="rohsCompliant"
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                checked={formData.rohsCompliant || false}
+                onChange={(e) => handleInputChange('rohsCompliant', e.target.checked)}
+              />
+              <label htmlFor="rohsCompliant" className="ml-2 text-sm text-gray-700">
+                RoHS Compliant
               </label>
             </div>
-          );
-        case 'specialTermsAndConditions':
-        case 'dhlFedexAccountNumber':
-          return (
-            <input
-              type="text"
-              value={formData[field] || ''}
-              onChange={(e) => handleInputChange(field, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-      }
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes
+              </label>
+              <textarea
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.notesText || ''}
+                onChange={(e) => handleInputChange('notesText', e.target.value)}
+                placeholder="Optional notes..."
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Attach File
+              </label>
+              <input
+                type="file"
+                onChange={handleFileChange}
+                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+            </div>
+          </>
+        );
+
+      case 'QUOTATION_SHARED_WITH_CUSTOMER':
+        return (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Model *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.model || ''}
+                onChange={(e) => handleInputChange('model', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Brand *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.brand || ''}
+                onChange={(e) => handleInputChange('brand', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.des || ''}
+                onChange={(e) => handleInputChange('des', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Country of Origin *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.coo || ''}
+                onChange={(e) => handleInputChange('coo', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date Code *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.dc || ''}
+                onChange={(e) => handleInputChange('dc', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
+              <input
+                type="number"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.qty || ''}
+                onChange={(e) => handleInputChange('qty', parseInt(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quote *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.quote || ''}
+                onChange={(e) => handleInputChange('quote', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Warranty *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.warranty || ''}
+                onChange={(e) => handleInputChange('warranty', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Lead Time *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.leadTime || ''}
+                onChange={(e) => handleInputChange('leadTime', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Deal Value *</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.dealValue || ''}
+                onChange={(e) => handleInputChange('dealValue', parseFloat(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Total Value *</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.totalValue || ''}
+                onChange={(e) => handleInputChange('totalValue', parseFloat(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Gross Margin *</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.grossMargin || ''}
+                onChange={(e) => handleInputChange('grossMargin', parseFloat(e.target.value))}
+              />
+            </div>
+          </>
+        );
+
+      case 'NEGOTIATION_STARTED':
+        return (
+          <>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Negotiation Notes
+              </label>
+              <textarea
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.notesText || ''}
+                onChange={(e) => handleInputChange('notesText', e.target.value)}
+                placeholder="Enter negotiation notes..."
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Attach File
+              </label>
+              <input
+                type="file"
+                onChange={handleFileChange}
+                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+            </div>
+          </>
+        );
+
+      case 'PO_RECEIVED':
+        return (
+          <>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                PO Document * (Required)
+              </label>
+              <input
+                type="file"
+                required
+                onChange={handleFileChange}
+                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Special Terms & Conditions *
+              </label>
+              <textarea
+                required
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.specialTermsAndConditions || ''}
+                onChange={(e) => handleInputChange('specialTermsAndConditions', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                DHL/FedEx Account Number *
+              </label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.dhlFedexAccountNumber || ''}
+                onChange={(e) => handleInputChange('dhlFedexAccountNumber', e.target.value)}
+              />
+            </div>
+          </>
+        );
+
+      case 'PARTS_DELIVERED':
+        return (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Model *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.model || ''}
+                onChange={(e) => handleInputChange('model', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
+              <input
+                type="number"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.qty || ''}
+                onChange={(e) => handleInputChange('qty', parseInt(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Price per Unit *</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.pricePerUnit || ''}
+                onChange={(e) => handleInputChange('pricePerUnit', parseFloat(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date Code *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.dc || ''}
+                onChange={(e) => handleInputChange('dc', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Lead Time *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.leadTime || ''}
+                onChange={(e) => handleInputChange('leadTime', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Delivered At</label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.deliveredAt || ''}
+                onChange={(e) => handleInputChange('deliveredAt', e.target.value)}
+              />
+            </div>
+          </>
+        );
+
+      default:
+        return null;
     }
-
-    // Parts Delivered fields
-    if (targetStage === 'PARTS_DELIVERED') {
-      switch (field) {
-        case 'model':
-        case 'dc':
-        case 'leadTime':
-          return (
-            <input
-              type="text"
-              value={formData[field] || ''}
-              onChange={(e) => handleInputChange(field, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-        case 'qty':
-          return (
-            <input
-              type="number"
-              value={formData.qty || ''}
-              onChange={(e) => handleInputChange('qty', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-        case 'pricePerUnit':
-          return (
-            <input
-              type="number"
-              step="0.01"
-              value={formData.pricePerUnit || ''}
-              onChange={(e) => handleInputChange('pricePerUnit', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          );
-      }
-    }
-
-    // Default text input
-    return (
-      <input
-        type="text"
-        value={formData[field] || ''}
-        onChange={(e) => handleInputChange(field, e.target.value)}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-        required
-      />
-    );
-  };
-
-  const getFieldLabel = (field: string) => {
-    const labels: Record<string, string> = {
-      partNumber: 'Part Number',
-      quantity: 'Quantity',
-      regionCountry: 'Region/Country',
-      supplierName: 'Supplier Name',
-      manufacturer: 'Manufacturer',
-      amount: 'Amount',
-      testingType: 'Testing Type',
-      model: 'Model',
-      brand: 'Brand',
-      des: 'Description',
-      coo: 'Country of Origin',
-      dc: 'Date Code',
-      qty: 'Quantity',
-      quote: 'Quote Number',
-      warranty: 'Warranty',
-      leadTime: 'Lead Time',
-      dealValue: 'Deal Value',
-      totalValue: 'Total Value',
-      grossMargin: 'Gross Margin',
-      poDocument: 'PO Document',
-      specialTermsAndConditions: 'Special Terms & Conditions',
-      dhlFedexAccountNumber: 'DHL/FedEx Account Number',
-      pricePerUnit: 'Price Per Unit'
-    };
-    return labels[field] || field.replace(/([A-Z])/g, ' $1').trim();
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Move to {getStageDisplayName(targetStage)}
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">{leadTitle}</p>
+            <h2 className="text-xl font-bold text-gray-900">Fill Required Information</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Moving "{leadTitle}" to {targetStage.replace(/_/g, ' ')}
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <XMarkIcon className="w-6 h-6" />
+            <XMarkIcon className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-            <p className="text-sm text-blue-800">
-              Please provide the following information to move this lead to <strong>{getStageDisplayName(targetStage)}</strong>
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {missingFields.map((field) => (
-              <div key={field}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {getFieldLabel(field)} <span className="text-red-500">*</span>
-                </label>
-                {renderFieldInput(field)}
-              </div>
-            ))}
-
-            {/* Optional fields */}
-            {(targetStage === 'QUOTATION_RECEIVED_FROM_SUPPLIER' || 
-              targetStage === 'QUOTATION_SHARED_WITH_CUSTOMER' ||
-              targetStage === 'NEGOTIATION_STARTED' ||
-              targetStage === 'PO_RECEIVED' ||
-              targetStage === 'PARTS_DELIVERED') && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    value={formData.notesText || ''}
-                    onChange={(e) => handleInputChange('notesText', e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Add any additional notes..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Attach File (Optional)
-                  </label>
-                  <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-500">
-                    <DocumentArrowUpIcon className="w-6 h-6 mr-2 text-gray-400" />
-                    <span className="text-sm text-gray-600">
-                      {files.notesFile ? files.notesFile.name : 'Upload supporting document'}
-                    </span>
-                    <input
-                      type="file"
-                      onChange={(e) => handleFileChange('notesFile', e.target.files?.[0] || null)}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-6 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-              disabled={loading}
-            >
-              {loading ? 'Moving...' : `Move to ${getStageDisplayName(targetStage)}`}
-            </button>
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+          <div className="grid grid-cols-2 gap-4">
+            {renderFormFields()}
           </div>
         </form>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 flex items-center gap-2"
+          >
+            {isSubmitting && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
+            {isSubmitting ? 'Moving...' : 'Confirm & Move'}
+          </button>
+        </div>
       </div>
     </div>
   );

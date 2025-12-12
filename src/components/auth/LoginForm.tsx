@@ -19,6 +19,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const login = authStore((state) => state.login);
+  const [isLoggingIn, setIsLoggingIn] = React.useState(false);
 
   const {
     register,
@@ -30,6 +31,13 @@ export const LoginForm: React.FC = () => {
   });
 
   const onSubmit = async (data: LoginFormData) => {
+    // Prevent double submission
+    if (isLoggingIn) {
+      return;
+    }
+
+    setIsLoggingIn(true);
+
     try {
       let response;
 
@@ -46,8 +54,13 @@ export const LoginForm: React.FC = () => {
         login(response.user, response.accessToken, response.refreshToken);
       }
 
-      navigate('/leads');
+      // Small delay to ensure state is updated before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      navigate('/leads', { replace: true });
     } catch (error: any) {
+      setIsLoggingIn(false);
+      
       if (error.errors) {
         Object.entries(error.errors).forEach(([field, messages]) => {
           setError(field as keyof LoginFormData, {
@@ -55,7 +68,9 @@ export const LoginForm: React.FC = () => {
           });
         });
       } else {
-        setError('root', { message: error.message || 'Login failed. Please check your credentials.' });
+        setError('root', { 
+          message: error.message || 'Login failed. Please check your credentials.' 
+        });
       }
     }
   };
@@ -82,6 +97,7 @@ export const LoginForm: React.FC = () => {
               label="Email address"
               type="email"
               autoComplete="email"
+              disabled={isLoggingIn}
               {...register('email')}
               error={errors.email?.message}
             />
@@ -90,6 +106,7 @@ export const LoginForm: React.FC = () => {
               label="Password"
               type="password"
               autoComplete="current-password"
+              disabled={isLoggingIn}
               {...register('password')}
               error={errors.password?.message}
             />
@@ -98,6 +115,7 @@ export const LoginForm: React.FC = () => {
               <input
                 type="checkbox"
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                disabled={isLoggingIn}
                 {...register('remember_me')}
               />
               <label className="ml-2 block text-sm text-gray-900">
@@ -114,7 +132,8 @@ export const LoginForm: React.FC = () => {
 
           <Button
             type="submit"
-            isLoading={isSubmitting}
+            isLoading={isSubmitting || isLoggingIn}
+            disabled={isLoggingIn}
             className="w-full"
             size="lg"
           >

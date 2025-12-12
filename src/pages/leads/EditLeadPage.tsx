@@ -1,249 +1,153 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FaArrowLeft } from 'react-icons/fa';
-import { LeadForm } from '../../components/leads';
-import { leadService } from '../../lib/leadService';
-import type { CreateLeadRequest } from '../../types';
-import { Button } from '../../components/ui';
-
-// Match API response structure
-interface PersonDetails {
-  id: string;
-  name: string;
-  targetSegment: string;
-  phone: string;
-  email: string;
-  quotationLink: string;
-}
-
-interface Notes {
-  text: string;
-  fileUrls: string[];
-}
-
-interface LeadDetail {
-  id: string;
-  contactPerson: string;
-  organization: string;
-  title: string;
-  value: number;
-  currency: string;
-  label: string;
-  owner: string;
-  sourceChannel: string;
-  sourceChannelId: string;
-  sourceOrigin: string;
-  commentIds: string[] | null;
-  expectedCloseDate: string;
-  leadCreated: string;
-  updatedAt: string | null;
-  personDetails: PersonDetails;
-  notes: Notes;
-  stage: string;
-}
-
-// Toggle for mock data
-const USE_MOCK_DATA = true;
-
-const mockLeadDetail: LeadDetail = {
-  id: "a5e98c2e-3053-45c6-b7ec-f0b9f9dc897b",
-  contactPerson: "john",
-  organization: "abc",
-  title: "po",
-  value: 50000,
-  currency: "USD",
-  label: "HOT",
-  owner: "megha",
-  sourceChannel: "abc",
-  sourceChannelId: "12345",
-  sourceOrigin: "manual",
-  commentIds: null,
-  expectedCloseDate: "2025-11-05",
-  leadCreated: "2025-11-01T23:18:53.131",
-  updatedAt: null,
-  personDetails: {
-    id: "80eccc76-a339-4450-aabb-b3149c07fc11",
-    name: "ACME Lead",
-    targetSegment: "Electronics",
-    phone: "9876543210",
-    email: "reshmi@gmail.com",
-    quotationLink: "https://example.com/quote.pdf"
-  },
-  notes: {
-    text: "testing notes",
-    fileUrls: [
-      "http://res.cloudinary.com/dolx1bzdi/image/upload/v1762019336/lead_service/files/msuaijkgmjiciy5tqycq.jpg"
-    ]
-  },
-  stage: "LEAD"
-};
+import { LeadForm } from '../../components/leads/LeadForm';
+import { leadApi } from '../../api/leadApi';
+import type{ CreateLeadRequest, Lead } from '../../types/lead.types';
 
 export const EditLeadPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const [lead, setLead] = useState<LeadDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [leadData, setLeadData] = useState<Lead | null>(null);
 
+  // Fetch lead data on mount
   useEffect(() => {
-    if (id) {
-      fetchLead();
-    }
+    const fetchLead = async () => {
+      if (!id) {
+        setError('Lead ID is missing');
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        console.log('EditLeadPage: Fetching lead with ID:', id);
+        const lead = await leadApi.getLeadById(id);
+        console.log('EditLeadPage: Lead fetched successfully:', lead);
+        setLeadData(lead);
+      } catch (err: any) {
+        console.error('EditLeadPage: Error fetching lead:', err);
+        setError(err.message || 'Failed to fetch lead');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLead();
   }, [id]);
 
-  const fetchLead = async () => {
-    try {
-      setLoading(true);
-      
-      if (USE_MOCK_DATA) {
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        setLead(mockLeadDetail);
-      } else {
-        const data = await leadService.getLeadById(id!);
-        setLead(data as LeadDetail);
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch lead');
-      console.error('Failed to fetch lead:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSubmit = async (data: CreateLeadRequest) => {
-    console.log('EditLeadPage: Submitting updated lead data:', data);
+    if (!id) return;
+
+    setIsSubmitting(true);
+    setError(null);
 
     try {
-      if (USE_MOCK_DATA) {
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        console.log('EditLeadPage: Lead updated successfully (mock mode)');
-        alert('Lead successfully updated (mock mode)');
-        navigate(`/leads/${id}`);
-      } else {
-        console.log('EditLeadPage: Calling leadService.updateLead...');
-        const response = await leadService.updateLead(id!, data);
-        console.log('EditLeadPage: Lead updated successfully:', response);
-        navigate(`/leads/${id}`, {
-          state: { message: 'Lead updated successfully' },
-        });
-      }
-    } catch (error: any) {
-      console.error('EditLeadPage: Error updating lead:', error);
-      console.error('EditLeadPage: Error details:', {
-        message: error.message,
-        status: error.status,
-        data: error.data,
-        response: error.response
-      });
-      setError(error.response?.data?.message || 'Failed to update lead');
-      throw error;
+      console.log('EditLeadPage: Updating lead with ID:', id, 'Data:', data);
+      
+      const response = await leadApi.updateLead(id, data);
+      
+      console.log('EditLeadPage: Lead updated successfully:', response);
+      
+      // Show success message
+      alert(`Success: ${response.message || 'Lead updated successfully'}`);
+      
+      // Navigate back to leads list or detail page
+      navigate('/leads');
+    } catch (err: any) {
+      console.error('EditLeadPage: Error updating lead:', err);
+      setError(err.message || 'Failed to update lead');
+      
+      // Show error message
+      alert(`Error: ${err.message || 'Failed to update lead'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  if (loading) {
+  // Loading State
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-gray-500">Loading lead data...</div>
-      </div>
-    );
-  }
-
-  if (error && !lead) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <div className="text-red-500 mb-4">Error: {error}</div>
-        <button
-          onClick={() => navigate('/leads')}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-        >
-          Back to Leads
-        </button>
-      </div>
-    );
-  }
-
-  if (!lead) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <div className="text-gray-500 mb-4">Lead not found</div>
-        <button
-          onClick={() => navigate('/leads')}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-        >
-          Back to Leads
-        </button>
-      </div>
-    );
-  }
-
-  // Transform API response to form data structure
-  const initialFormData = {
-    contactPerson: lead.contactPerson,
-    organization: lead.organization,
-    title: lead.title,
-    value: lead.value,
-    currency: lead.currency,
-    label: lead.label,
-    owner: lead.owner,
-    sourceChannel: lead.sourceChannel,
-    sourceChannelId: lead.sourceChannelId,
-    sourceOrigin: lead.sourceOrigin,
-    expectedCloseDate: lead.expectedCloseDate,
-    phone: lead.personDetails.phone,
-    name: lead.personDetails.name,
-    targetSegment: lead.personDetails.targetSegment,
-    email: lead.personDetails.email,
-    quotationLink: lead.personDetails.quotationLink,
-    notesText: lead.notes.text,
-    stage: lead.stage,
-    createdBy: 'System', // You might want to track who created it
-    createdDate: lead.leadCreated,
-  };
-
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Mock Mode Banner */}
-      {USE_MOCK_DATA && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-2 flex items-center justify-between flex-shrink-0">
-          <span className="text-sm text-yellow-800">
-            🎭 <strong>Mock Mode:</strong> Using sample data
-          </span>
-        </div>
-      )}
-
-      {/* Fixed Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            onClick={() => navigate(`/leads/${id}`)}
-            className="p-2"
-          >
-            <FaArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Edit Lead</h1>
-            <p className="text-gray-600">{lead.title}</p>
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         </div>
       </div>
+    );
+  }
 
-      {/* Scrollable Form Area */}
-      <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
-        <div className="max-w-5xl mx-auto">
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
+  // Error State (no lead data)
+  if (error && !leadData) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <div className="flex items-start">
+              <svg className="h-6 w-6 text-red-400 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <h3 className="text-lg font-medium text-red-800">Error loading lead</h3>
+                <p className="mt-2 text-sm text-red-700">{error}</p>
+              </div>
             </div>
-          )}
-          <LeadForm 
-            onSubmit={handleSubmit} 
-            initialData={initialFormData}
+            <div className="mt-4">
+              <button
+                onClick={() => navigate('/leads')}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
+              >
+                Back to Leads
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Back Button */}
+        <div className="mb-6">
+          <button
+            onClick={() => navigate('/leads')}
+            className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Leads
+          </button>
+        </div>
+
+        {/* Error Banner (submission error) */}
+        {error && leadData && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <svg className="h-5 w-5 text-red-400 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <h3 className="text-sm font-medium text-red-800">Error updating lead</h3>
+                <p className="mt-1 text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Lead Form */}
+        {leadData && (
+          <LeadForm
+            onSubmit={handleSubmit}
+            isSubmitting={isSubmitting}
+            initialData={leadData}
             mode="edit"
           />
-        </div>
+        )}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ export interface QuotationCustomerNotes {
 
 export interface QuotationCustomer {
   id?: string;
+  leadId?: string;
   model: string;
   brand: string;
   des: string;
@@ -46,7 +47,7 @@ export interface CreateQuotationCustomerRequest {
 }
 
 export const quotationCustomerApi = {
-  create: async (data: CreateQuotationCustomerRequest): Promise<{ message: string }> => {
+  create: async (leadId: string, data: CreateQuotationCustomerRequest): Promise<{ message: string }> => {
     const formData = new FormData();
     
     // Required fields
@@ -70,7 +71,7 @@ export const quotationCustomerApi = {
     if (data.notesFile) formData.append('notesFile', data.notesFile);
     if (data.stage) formData.append('stage', data.stage);
 
-    const response = await axiosInstance.post('/quotations-customers', formData, {
+    const response = await axiosInstance.post(`/quotations-customers/${leadId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
@@ -81,8 +82,8 @@ export const quotationCustomerApi = {
     return response.data;
   },
 
-  getById: async (id: string): Promise<QuotationCustomer> => {
-    const response = await axiosInstance.get(`/quotations-customers/${id}`);
+  getByLeadId: async (leadId: string): Promise<QuotationCustomer> => {
+    const response = await axiosInstance.get(`/quotations-customers/${leadId}`);
     return response.data;
   },
 

@@ -7,6 +7,7 @@ export interface NegotiationNotes {
 
 export interface Negotiation {
   id?: string;
+  leadId?: string;
   notes: NegotiationNotes;
   stage: string;
 }
@@ -18,13 +19,13 @@ export interface CreateNegotiationRequest {
 }
 
 export const negotiationApi = {
-  create: async (data: CreateNegotiationRequest): Promise<{ message: string }> => {
+  create: async (leadId: string, data: CreateNegotiationRequest): Promise<{ message: string }> => {
     const formData = new FormData();
     if (data.notesText) formData.append('notesText', data.notesText);
     if (data.notesFile) formData.append('notesFile', data.notesFile);
     if (data.stage) formData.append('stage', data.stage);
 
-    const response = await axiosInstance.post('/negotiations', formData, {
+    const response = await axiosInstance.post(`/negotiations/${leadId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
@@ -35,8 +36,8 @@ export const negotiationApi = {
     return response.data;
   },
 
-  getById: async (id: string): Promise<Negotiation> => {
-    const response = await axiosInstance.get(`/negotiations/${id}`);
+  getByLeadId: async (leadId: string): Promise<Negotiation> => {
+    const response = await axiosInstance.get(`/negotiations/${leadId}`);
     return response.data;
   },
 

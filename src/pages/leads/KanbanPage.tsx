@@ -17,9 +17,10 @@ import { leadService } from '../../lib/leadService';
 import { kanbanService } from '../../lib/kanbanService';
 import type { LeadStage } from '../../types';
 import { StageTransitionModal } from '../../components/leads/StageTransitionModal';
+import { KanbanLeadDetailModal } from '../../components/leads/KanbanLeadDetailModal';
 
 // Mock mode toggle
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 
 const STAGES: { id: Stage; name: string; color: string }[] = [
   { id: 'LEAD', name: 'Lead', color: 'bg-gray-500' },
@@ -224,6 +225,9 @@ export const KanbanPage: React.FC = () => {
     missingFields: string[];
   } | null>(null);
 
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -388,7 +392,8 @@ export const KanbanPage: React.FC = () => {
   };
 
   const handleLeadClick = (lead: Lead) => {
-    navigate(`/leads/${lead.id}`);
+    setSelectedLeadId(lead.id);
+    setIsDetailModalOpen(true);
   };
 
   const activeLead = leads.find(l => l.id === activeId);
@@ -407,7 +412,7 @@ export const KanbanPage: React.FC = () => {
       {USE_MOCK_DATA && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-2 flex items-center justify-between flex-shrink-0">
           <span className="text-sm text-yellow-800">
-            🎭 <strong>Mock Mode:</strong> Using sample data. Drag & drop between stages to test.
+             <strong>Mock Mode:</strong> Using sample data. Drag & drop between stages to test.
           </span>
         </div>
       )}
@@ -502,6 +507,18 @@ export const KanbanPage: React.FC = () => {
           isOpen={true}
           onClose={handleCancelMove}
           onConfirm={handleConfirmMove}
+        />
+      )}
+
+      {/* ADD THIS NEW MODAL - Lead Detail Modal */}
+      {selectedLeadId && (
+        <KanbanLeadDetailModal
+          leadId={selectedLeadId}
+          isOpen={isDetailModalOpen}
+          onClose={() => {
+            setIsDetailModalOpen(false);
+            setSelectedLeadId(null);
+          }}
         />
       )}
 

@@ -3,26 +3,17 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button, Input, Select } from '../ui';
-import type { Lead } from '../../types';
+import { 
+  Labels, 
+  Stage, 
+  getLeadName,
+  getLeadPhone,
+  getLeadEmail,
+  getLeadTargetSegment,
+  getLeadQuotationLink
+} from '../../types/lead.types';
+import type{ CreateLeadRequest, Lead } from '../../types/lead.types';
 import { authStore } from '../../stores/authStore';
-
-// Enums matching API
-export enum Labels {
-  HOT = 'HOT',
-  WARM = 'WARM',
-  COLD = 'COLD'
-}
-
-export enum Stage {
-  LEAD = 'LEAD',
-  QUOTATION_RECEIVED_FROM_SUPPLIER = 'QUOTATION_RECEIVED_FROM_SUPPLIER',
-  QUOTATION_SHARED_WITH_CUSTOMER = 'QUOTATION_SHARED_WITH_CUSTOMER',
-  NEGOTIATION_STARTED = 'NEGOTIATION_STARTED',
-  PO_RECEIVED = 'PO_RECEIVED',
-  PARTS_DELIVERED = 'PARTS_DELIVERED',
-  CLOSED_WON = 'CLOSED_WON',
-  CLOSED_LOST = 'CLOSED_LOST'
-}
 
 // Updated schema matching API exactly
 const leadSchema = z.object({
@@ -47,10 +38,6 @@ const leadSchema = z.object({
 });
 
 type LeadFormData = z.infer<typeof leadSchema>;
-
-export interface CreateLeadRequest extends LeadFormData {
-  notesFile?: File;
-}
 
 interface LeadFormProps {
   onSubmit: (data: CreateLeadRequest) => Promise<void>;
@@ -101,36 +88,43 @@ export const LeadForm: React.FC<LeadFormProps> = ({
 }) => {
   const [isFormSubmitting, setIsFormSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [existingFileUrls, setExistingFileUrls] = useState<string[]>([]);
   const user = authStore((state) => state.user);
   const isEditMode = mode === 'edit';
+
+  // Helper function to extract form data from Lead (handles nested structure)
+  const extractFormData = (lead: Lead): Partial<LeadFormData> => {
+    return {
+      contactPerson: lead.contactPerson,
+      organization: lead.organization,
+      title: lead.title,
+      value: lead.value,
+      currency: lead.currency,
+      label: lead.label,
+      owner: lead.owner,
+      sourceChannel: lead.sourceChannel,
+      sourceChannelId: lead.sourceChannelId,
+      sourceOrigin: lead.sourceOrigin,
+      expectedCloseDate: lead.expectedCloseDate,
+      phone: getLeadPhone(lead),
+      name: getLeadName(lead),
+      targetSegment: getLeadTargetSegment(lead) || '',
+      email: getLeadEmail(lead) || '',
+      quotationLink: getLeadQuotationLink(lead) || '',
+      notesText: lead.notes?.text || lead.notesText || '',
+      stage: lead.stage,
+    };
+  };
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
   } = useForm<LeadFormData>({
     resolver: zodResolver(leadSchema),
-    defaultValues: initialData ? {
-      contactPerson: (initialData as any).contactPerson,
-      organization: (initialData as any).organization,
-      title: (initialData as any).title,
-      value: (initialData as any).value,
-      currency: (initialData as any).currency,
-      label: (initialData as any).label,
-      owner: (initialData as any).owner,
-      sourceChannel: (initialData as any).sourceChannel,
-      sourceChannelId: (initialData as any).sourceChannelId,
-      sourceOrigin: (initialData as any).sourceOrigin,
-      expectedCloseDate: (initialData as any).expectedCloseDate,
-      phone: (initialData as any).phone,
-      name: (initialData as any).name,
-      targetSegment: (initialData as any).targetSegment || '',
-      email: (initialData as any).email || '',
-      quotationLink: (initialData as any).quotationLink || '',
-      notesText: (initialData as any).notesText || '',
-      stage: (initialData as any).stage as Stage,
-    } : {
+    defaultValues: initialData ? extractFormData(initialData) : {
       currency: 'USD',
       label: Labels.WARM,
       stage: Stage.LEAD,
@@ -138,12 +132,26 @@ export const LeadForm: React.FC<LeadFormProps> = ({
       email: '',
       quotationLink: '',
       notesText: '',
+      owner: user?.username || '',
     },
   });
+
+  // Load existing files when in edit mode
+  useEffect(() => {
+    if (isEditMode && initialData?.notes?.fileUrls) {
+      setExistingFileUrls(initialData.notes.fileUrls);
+    }
+  }, [isEditMode, initialData]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        return;
+      }
+      
       setSelectedFile(file);
       console.log('LeadForm: File selected:', file.name);
     }
@@ -186,30 +194,16 @@ export const LeadForm: React.FC<LeadFormProps> = ({
 
   const handleReset = () => {
     if (isEditMode && initialData) {
-      reset({
-        contactPerson: (initialData as any).contactPerson,
-        organization: (initialData as any).organization,
-        title: (initialData as any).title,
-        value: (initialData as any).value,
-        currency: (initialData as any).currency,
-        label: (initialData as any).label,
-        owner: (initialData as any).owner,
-        sourceChannel: (initialData as any).sourceChannel,
-        sourceChannelId: (initialData as any).sourceChannelId,
-        sourceOrigin: (initialData as any).sourceOrigin,
-        expectedCloseDate: (initialData as any).expectedCloseDate,
-        phone: (initialData as any).phone,
-        name: (initialData as any).name,
-        targetSegment: (initialData as any).targetSegment || '',
-        email: (initialData as any).email || '',
-        quotationLink: (initialData as any).quotationLink || '',
-        notesText: (initialData as any).notesText || '',
-        stage: (initialData as any).stage as Stage,
-      });
+      const formData = extractFormData(initialData);
+      reset(formData);
       setSelectedFile(null);
+      if (initialData.notes?.fileUrls) {
+        setExistingFileUrls(initialData.notes.fileUrls);
+      }
     } else {
       reset();
       setSelectedFile(null);
+      setExistingFileUrls([]);
     }
   };
 
@@ -218,14 +212,14 @@ export const LeadForm: React.FC<LeadFormProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-    <h2 className="text-lg font-semibold text-gray-900 mb-6">
-      {isEditMode ? 'Edit Lead' : 'Create New Lead'}
-    </h2>
-    <form 
-      onSubmit={handleSubmit(handleFormSubmit, handleFormError)}
-      className="space-y-6"
-    >
+    <div className="bg-white rounded-lg shadow-sm p-6 max-h-[calc(100vh-8rem)] overflow-y-auto">
+      <h2 className="text-lg font-semibold text-gray-900 mb-6 sticky top-0 bg-white z-10 pb-4 border-b">
+        {isEditMode ? 'Edit Lead' : 'Create New Lead'}
+      </h2>
+      <form 
+        onSubmit={handleSubmit(handleFormSubmit, handleFormError)}
+        className="space-y-6"
+      >
         {/* Contact Information Section */}
         <div>
           <h3 className="text-md font-semibold text-gray-800 mb-4 pb-2 border-b">
@@ -408,9 +402,35 @@ export const LeadForm: React.FC<LeadFormProps> = ({
               )}
             </div>
 
+            {/* Display existing files in edit mode */}
+            {isEditMode && existingFileUrls.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Existing Files
+                </label>
+                <div className="space-y-2">
+                  {existingFileUrls.map((url, index) => (
+                    <div key={index} className="flex items-center space-x-2 text-sm">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <a 
+                        href={url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        View File {index + 1}
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Attach File (Optional)
+                {isEditMode ? 'Upload New File (Optional)' : 'Attach File (Optional)'}
               </label>
               <div className="flex items-center space-x-3">
                 <input
@@ -418,6 +438,7 @@ export const LeadForm: React.FC<LeadFormProps> = ({
                   id="file-upload"
                   className="hidden"
                   onChange={handleFileChange}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
                 />
                 <label
                   htmlFor="file-upload"
@@ -470,26 +491,36 @@ export const LeadForm: React.FC<LeadFormProps> = ({
           <div className="border-t border-gray-200 pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
               <div>
-                <span className="font-medium">Created by:</span>{' '}
-                {initialData.createdBy || 'Unknown'}
+                <span className="font-medium">Lead ID:</span>{' '}
+                {initialData.id}
               </div>
               <div>
-                <span className="font-medium">Created date:</span>{' '}
-                {initialData.createdDate
-                  ? new Date(initialData.createdDate).toLocaleDateString()
-                  : 'Unknown'
-                }
+                <span className="font-medium">Created:</span>{' '}
+                {initialData.leadCreated
+                  ? new Date(initialData.leadCreated).toLocaleString()
+                  : 'Unknown'}
+              </div>
+              {initialData.updatedAt && (
+                <div>
+                  <span className="font-medium">Last Updated:</span>{' '}
+                  {new Date(initialData.updatedAt).toLocaleString()}
+                </div>
+              )}
+              <div>
+                <span className="font-medium">Current Stage:</span>{' '}
+                {initialData.stage}
               </div>
             </div>
           </div>
         )}
 
         {/* Form Actions */}
-        <div className="flex justify-end space-x-3 pt-6 border-t">
+        <div className="flex justify-end space-x-3 pt-6 border-t sticky bottom-0 bg-white">
           <Button
             type="button"
             variant="secondary"
             onClick={handleReset}
+            disabled={isSubmitting || isFormSubmitting}
           >
             {isEditMode ? 'Reset Changes' : 'Reset'}
           </Button>

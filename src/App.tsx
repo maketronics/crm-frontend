@@ -11,12 +11,17 @@ import { store, persistor } from './stores/store';
 import { Layout, ProtectedRoute } from './components/ui';
 import { LoginPage } from './pages/auth/LoginPage';
 import { UsersPage } from './pages/auth/UsersPage';
-import LeadsPage from './pages/leads/LeadsPage';
+import { LeadsPage } from './pages/leads/LeadsPage';
 import { CreateLeadPage } from './pages/leads/CreateLeadPage';
 import { EditLeadPage } from './pages/leads/EditLeadPage';
 import { LeadDetailPage } from './pages/leads/LeadDetailPage';
 import { KanbanPage } from './pages/leads/KanbanPage';
 import { authStore } from './stores/authStore';
+import CampaignPage from './pages/campaigns/CampaignPage';
+import { DatabasePage } from './pages/database/DatabasePage';
+import { EmailCampaignsPage } from './pages/campaigns/emails';
+import DealCampaignPage from './pages/campaigns/deals';
+
 
 function AppContent() {
   const isAuthenticated = authStore((state) => state.isAuthenticated);
@@ -44,6 +49,7 @@ function AppContent() {
           }
         >
           <Route index element={<Navigate to="/leads" replace />} />
+          <Route path="/leads/:id/edit" element={<EditLeadPage />} />
 
           <Route
             path="users"
@@ -53,7 +59,11 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
-
+          <Route path="/campaigns/deals" element={<DealCampaignPage />} />
+          <Route path="/campaigns" element={<CampaignPage />} />
+          <Route path="/campaigns/emails" element={<EmailCampaignsPage />} />
+          <Route path="database" element={<DatabasePage />} />
+          <Route path="campaigns" element={<CampaignPage />} />
           <Route path="leads" element={<LeadsPage />} />
           <Route path="leads/kanban" element={<KanbanPage />} />
           <Route path="leads/create" element={<CreateLeadPage />} />

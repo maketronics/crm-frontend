@@ -11,6 +11,8 @@ import {
   FaSignOutAlt,
   FaKey,
   FaUserCircle,
+  FaBullhorn,
+  FaDatabase, // ADD THIS - Database icon
 } from 'react-icons/fa';
 
 export const Layout: React.FC = () => {
@@ -68,6 +70,17 @@ export const Layout: React.FC = () => {
           <FaColumns size={20} />
         </button>
 
+        {/* Database Button - NEW */}
+        <button
+          onClick={() => navigate('/database')}
+          className={`w-10 h-10 flex items-center justify-center text-white hover:bg-indigo-800 rounded transition-colors ${
+            isActive('/database') ? 'bg-indigo-800' : ''
+          }`}
+          title="Customer Database"
+        >
+          <FaDatabase size={20} />
+        </button>
+
         <button
           onClick={() => navigate('/leads/create')}
           className="w-10 h-10 flex items-center justify-center text-white hover:bg-indigo-800 rounded transition-colors"
@@ -76,8 +89,19 @@ export const Layout: React.FC = () => {
           <FaPlus size={20} />
         </button>
 
+        {/* Campaign Button */}
+        <button
+          onClick={() => navigate('/campaigns')}
+          className={`w-10 h-10 flex items-center justify-center text-white hover:bg-indigo-800 rounded transition-colors ${
+            isActive('/campaigns') ? 'bg-indigo-800' : ''
+          }`}
+          title="Campaigns"
+        >
+          <FaBullhorn size={20} />
+        </button>
+        
         {/* Spacer to push profile to bottom */}
-        <div className="flex-1"></div>
+        <div className="flex-1 "></div>
 
         {/* Profile Menu at Bottom */}
         <div className="relative">
@@ -149,7 +173,7 @@ export const Layout: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden p-7 pb-7">
         <Outlet />
       </div>
 

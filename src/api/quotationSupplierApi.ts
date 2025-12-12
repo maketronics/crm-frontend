@@ -7,6 +7,7 @@ export interface QuotationSupplierNotes {
 
 export interface QuotationSupplier {
   id?: string;
+  leadId?: string;
   partNumber: string;
   supplierName: string;
   manufacturer: string;
@@ -34,7 +35,7 @@ export interface CreateQuotationSupplierRequest {
 }
 
 export const quotationSupplierApi = {
-  create: async (data: CreateQuotationSupplierRequest): Promise<{ message: string }> => {
+  create: async (leadId: string, data: CreateQuotationSupplierRequest): Promise<{ message: string }> => {
     const formData = new FormData();
     formData.append('partNumber', data.partNumber);
     formData.append('supplierName', data.supplierName);
@@ -49,7 +50,7 @@ export const quotationSupplierApi = {
     if (data.notesFile) formData.append('notesFile', data.notesFile);
     if (data.stage) formData.append('stage', data.stage);
 
-    const response = await axiosInstance.post('/quotations-suppliers', formData, {
+    const response = await axiosInstance.post(`/quotations-suppliers/${leadId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
@@ -60,8 +61,8 @@ export const quotationSupplierApi = {
     return response.data;
   },
 
-  getById: async (id: string): Promise<QuotationSupplier> => {
-    const response = await axiosInstance.get(`/quotations-suppliers/${id}`);
+  getByLeadId: async (leadId: string): Promise<QuotationSupplier> => {
+    const response = await axiosInstance.get(`/quotations-suppliers/${leadId}`);
     return response.data;
   },
 

@@ -7,6 +7,7 @@ export interface PartsDeliveredNote {
 
 export interface PartsDelivered {
   id?: string;
+  leadId?: string;
   model: string;
   qty: number;
   pricePerUnit: number;
@@ -30,7 +31,7 @@ export interface CreatePartsDeliveredRequest {
 }
 
 export const partsDeliveredApi = {
-  create: async (data: CreatePartsDeliveredRequest): Promise<{ message: string }> => {
+  create: async (leadId: string, data: CreatePartsDeliveredRequest): Promise<{ message: string }> => {
     const formData = new FormData();
     formData.append('model', data.model);
     formData.append('qty', data.qty.toString());
@@ -43,7 +44,7 @@ export const partsDeliveredApi = {
     if (data.notesFile) formData.append('notesFile', data.notesFile);
     if (data.stage) formData.append('stage', data.stage);
 
-    const response = await axiosInstance.post('/parts-delivered', formData, {
+    const response = await axiosInstance.post(`/parts-delivered/${leadId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
@@ -54,8 +55,8 @@ export const partsDeliveredApi = {
     return response.data;
   },
 
-  getById: async (id: string): Promise<PartsDelivered> => {
-    const response = await axiosInstance.get(`/parts-delivered/${id}`);
+  getByLeadId: async (leadId: string): Promise<PartsDelivered> => {
+    const response = await axiosInstance.get(`/parts-delivered/${leadId}`);
     return response.data;
   },
 
