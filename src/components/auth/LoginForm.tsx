@@ -20,33 +20,36 @@ export const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const login = authStore((state) => state.login);
   const [isLoggingIn, setIsLoggingIn] = React.useState(false);
+  const isSubmittingRef = React.useRef(false);
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
     setError,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
 
   const onSubmit = async (data: LoginFormData) => {
-    // Prevent double submission
-    if (isLoggingIn) {
+    if (isSubmittingRef.current || isLoggingIn) {
+      console.log('Login already in progress, ignoring duplicate submission');
       return;
     }
 
+    console.log('Starting login process...');
+    isSubmittingRef.current = true;
     setIsLoggingIn(true);
 
     try {
       let response;
 
       if (isMockMode()) {
-        // Use mock authentication for development
+        console.log('Using mock authentication');
         response = await mockLogin(data.email, data.password);
         login(response.user, response.access_token, 'mock-refresh-token');
       } else {
-        // Use real API authentication
+        console.log('Using real API authentication');
         response = await authService.login({
           email: data.email,
           password: data.password,
@@ -54,11 +57,11 @@ export const LoginForm: React.FC = () => {
         login(response.user, response.accessToken, response.refreshToken);
       }
 
-      // Small delay to ensure state is updated before navigation
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      console.log('Login successful, navigating to /leads');
       navigate('/leads', { replace: true });
     } catch (error: any) {
+      console.error('Login failed:', error);
+      isSubmittingRef.current = false;
       setIsLoggingIn(false);
       
       if (error.errors) {
@@ -132,7 +135,7 @@ export const LoginForm: React.FC = () => {
 
           <Button
             type="submit"
-            isLoading={isSubmitting || isLoggingIn}
+            isLoading={isLoggingIn}
             disabled={isLoggingIn}
             className="w-full"
             size="lg"

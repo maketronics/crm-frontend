@@ -1,4 +1,4 @@
-import { } from 'react';
+import { useEffect, useState } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -17,14 +17,66 @@ import { EditLeadPage } from './pages/leads/EditLeadPage';
 import { LeadDetailPage } from './pages/leads/LeadDetailPage';
 import { KanbanPage } from './pages/leads/KanbanPage';
 import { authStore } from './stores/authStore';
+import { authApiClient } from './lib/authApiClient';
 import CampaignPage from './pages/campaigns/CampaignPage';
 import { DatabasePage } from './pages/database/DatabasePage';
 import { EmailCampaignsPage } from './pages/campaigns/emails';
-import DealCampaignPage from './pages/campaigns/deals';
+import ExistingCampaignsPage from './pages/campaigns/emails/ExistingCampaignsPage';
 
+// In your routes:
+
+import DealCampaignPage from './pages/campaigns/deals';
 
 function AppContent() {
   const isAuthenticated = authStore((state) => state.isAuthenticated);
+  const accessToken = authStore((state) => state.accessToken);
+  const refreshToken = authStore((state) => state.refreshToken);
+  const logout = authStore((state) => state.logout);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    const validateAndRefreshAuth = async () => {
+      console.log('App: Initializing auth validation');
+      
+      // If no tokens exist, just mark as initialized
+      if (!accessToken && !refreshToken) {
+        console.log('App: No tokens found, marking as initialized');
+        setIsInitialized(true);
+        return;
+      }
+
+      // If we have a refresh token, try to refresh the auth
+      if (refreshToken) {
+        try {
+          console.log('App: Attempting to refresh authentication');
+          // The authApiClient interceptor will handle the refresh automatically
+          // We just need to make a test request
+          await authApiClient.get('/auth/me');
+          console.log('App: Auth validation successful');
+        } catch (error) {
+          console.error('App: Auth validation failed', error);
+          logout();
+        }
+      }
+      
+      setIsInitialized(true);
+      console.log('App: Auth validation complete');
+    };
+
+    validateAndRefreshAuth();
+  }, []); // Run once on mount
+
+  // Show loading while validating stored auth
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>
@@ -49,8 +101,7 @@ function AppContent() {
           }
         >
           <Route index element={<Navigate to="/leads" replace />} />
-          <Route path="/leads/:id/edit" element={<EditLeadPage />} />
-
+          
           <Route
             path="users"
             element={
@@ -59,16 +110,16 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
-          <Route path="/campaigns/deals" element={<DealCampaignPage />} />
-          <Route path="/campaigns" element={<CampaignPage />} />
-          <Route path="/campaigns/emails" element={<EmailCampaignsPage />} />
-          <Route path="database" element={<DatabasePage />} />
+          <Route path="/campaigns/emails/existing" element={<ExistingCampaignsPage />} />
           <Route path="campaigns" element={<CampaignPage />} />
+          <Route path="campaigns/deals" element={<DealCampaignPage />} />
+          <Route path="campaigns/emails" element={<EmailCampaignsPage />} />
+          <Route path="database" element={<DatabasePage />} />
           <Route path="leads" element={<LeadsPage />} />
           <Route path="leads/kanban" element={<KanbanPage />} />
           <Route path="leads/create" element={<CreateLeadPage />} />
           <Route path="leads/:id" element={<LeadDetailPage />} />
-          <Route path="leads/edit/:id" element={<EditLeadPage />} />
+          <Route path="leads/:id/edit" element={<EditLeadPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/login" replace />} />

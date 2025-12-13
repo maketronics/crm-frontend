@@ -21,6 +21,7 @@ class AuthApiClient {
   }
 
   private setupInterceptors() {
+    // Request interceptor - attach access token
     this.client.interceptors.request.use((config) => {
       const { accessToken } = authStore.getState();
       if (accessToken) {
@@ -29,6 +30,7 @@ class AuthApiClient {
       return config;
     });
 
+    // Response interceptor - handle token refresh
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
@@ -46,6 +48,7 @@ class AuthApiClient {
             return this.client(originalRequest);
           } catch (refreshError) {
             authStore.getState().logout();
+            window.location.href = '/login';
             return Promise.reject(refreshError);
           }
         }
@@ -72,10 +75,13 @@ class AuthApiClient {
       });
 
       const { accessToken, refreshToken: newRefreshToken } = response.data;
-      authStore.getState().setAccessToken(accessToken);
-      // Update refresh token if provided
-      if (newRefreshToken) {
-        authStore.getState().login(authStore.getState().user!, accessToken, newRefreshToken);
+      const { user } = authStore.getState();
+      
+      // Update tokens in store
+      if (user) {
+        authStore.getState().login(user, accessToken, newRefreshToken || refreshToken);
+      } else {
+        authStore.getState().setAccessToken(accessToken);
       }
     } catch (error) {
       throw new Error('Failed to refresh token');

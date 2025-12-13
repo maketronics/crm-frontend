@@ -28,14 +28,17 @@ export const UserListTable: React.FC<UserListTableProps> = ({
     {
       key: 'name',
       header: 'Name',
+      className: 'whitespace-nowrap',
     },
     {
       key: 'email',
       header: 'Email',
+      className: 'whitespace-nowrap',
     },
     {
       key: 'title',
       header: 'Title',
+      className: 'whitespace-nowrap',
     },
     {
       key: 'roles',
@@ -58,7 +61,7 @@ export const UserListTable: React.FC<UserListTableProps> = ({
       header: 'Status',
       render: (user: User) => (
         <span
-          className={`px-2 py-1 text-xs rounded-full ${
+          className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
             user.isActive
               ? 'bg-green-100 text-green-800'
               : 'bg-red-100 text-red-800'
@@ -72,7 +75,7 @@ export const UserListTable: React.FC<UserListTableProps> = ({
       key: 'actions',
       header: 'Actions',
       render: (user: User) => (
-        <div className="flex space-x-2">
+        <div className="flex space-x-2 whitespace-nowrap">
           <Button
             variant="ghost"
             size="sm"
@@ -114,11 +117,15 @@ export const UserListTable: React.FC<UserListTableProps> = ({
 
   return (
     <>
-      <Table
-        data={users}
-        columns={columns}
-        emptyMessage="No users found"
-      />
+      <div className="w-full border rounded-lg bg-white shadow-sm">
+        <div className="overflow-auto max-h-[calc(100vh-250px)]">
+          <Table
+            data={users}
+            columns={columns}
+            emptyMessage="No users found"
+          />
+        </div>
+      </div>
 
       {selectedUser && (
         <>
