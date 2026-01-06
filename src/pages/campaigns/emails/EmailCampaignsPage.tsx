@@ -333,12 +333,12 @@ export default function EmailCampaignsPage() {
       <div className="flex-1 overflow-auto bg-gray-50 min-h-screen">
         <div className="max-w-4xl mx-auto px-6 py-8">
           <div className="mb-8 flex items-center gap-4">
-           <button
-                           onClick={() => navigate('/campaigns')}
-                           className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                         >
-                           <ArrowLeftIcon className="w-6 h-6" />
-                         </button>
+            <button
+              onClick={() => navigate('/campaigns')}
+              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              <ArrowLeftIcon className="w-6 h-6" />
+            </button>
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 Email Campaigns
@@ -456,8 +456,8 @@ export default function EmailCampaignsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${campaign.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                            campaign.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
-                              'bg-gray-100 text-gray-800'
+                          campaign.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
                           }`}>
                           {campaign.status}
                         </span>
@@ -527,8 +527,8 @@ export default function EmailCampaignsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-500">Status</label>
                   <span className={`mt-1 inline-block px-2 py-1 text-xs font-semibold rounded-full ${selectedCampaign.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                      selectedCampaign.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
+                    selectedCampaign.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
                     }`}>
                     {selectedCampaign.status}
                   </span>

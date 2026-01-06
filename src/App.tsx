@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -22,57 +22,19 @@ import CampaignPage from './pages/campaigns/CampaignPage';
 import { DatabasePage } from './pages/database/DatabasePage';
 import { EmailCampaignsPage } from './pages/campaigns/emails';
 import ExistingCampaignsPage from './pages/campaigns/emails/ExistingCampaignsPage';
-
-// In your routes:
-
 import DealCampaignPage from './pages/campaigns/deals';
 
 function AppContent() {
   const isAuthenticated = authStore((state) => state.isAuthenticated);
-  const accessToken = authStore((state) => state.accessToken);
-  const refreshToken = authStore((state) => state.refreshToken);
-  const logout = authStore((state) => state.logout);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const _hasHydrated = authStore((state) => state._hasHydrated);
 
-  useEffect(() => {
-    const validateAndRefreshAuth = async () => {
-      console.log('App: Initializing auth validation');
-      
-      // If no tokens exist, just mark as initialized
-      if (!accessToken && !refreshToken) {
-        console.log('App: No tokens found, marking as initialized');
-        setIsInitialized(true);
-        return;
-      }
-
-      // If we have a refresh token, try to refresh the auth
-      if (refreshToken) {
-        try {
-          console.log('App: Attempting to refresh authentication');
-          // The authApiClient interceptor will handle the refresh automatically
-          // We just need to make a test request
-          await authApiClient.get('/auth/me');
-          console.log('App: Auth validation successful');
-        } catch (error) {
-          console.error('App: Auth validation failed', error);
-          logout();
-        }
-      }
-      
-      setIsInitialized(true);
-      console.log('App: Auth validation complete');
-    };
-
-    validateAndRefreshAuth();
-  }, []); // Run once on mount
-
-  // Show loading while validating stored auth
-  if (!isInitialized) {
+  // Show loading spinner until Zustand hydrates from localStorage
+  if (!_hasHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">Initializing...</p>
         </div>
       </div>
     );

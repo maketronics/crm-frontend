@@ -8,4 +8,4 @@ export { StatusPill } from './StatusPill';
 export { TagInput } from './TagInput';
 export { UserSelect } from './UserSelect';
 export { CommentsSection } from './CommentsSection';
-export { LeadDetailKanbanModal } from './LeadDetailKanbanModal';
+export  {LeadDetailKanbanModal } from './LeadDetailKanbanModal';

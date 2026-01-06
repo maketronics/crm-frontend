@@ -1,3 +1,4 @@
+/* src/components/ui/ProtectedRoute.tsx */
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { authStore } from '../../stores/authStore';
@@ -11,7 +12,19 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredAccess = [],
 }) => {
-  const { isAuthenticated, user } = authStore();
+  const { isAuthenticated, user, _hasHydrated } = authStore();
+
+  // Wait for hydration to complete before making auth decisions
+  if (!_hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;

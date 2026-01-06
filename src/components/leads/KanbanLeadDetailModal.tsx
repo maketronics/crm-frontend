@@ -10,7 +10,10 @@ import {
   EnvelopeIcon,
   CalendarIcon,
   CurrencyDollarIcon,
-  DocumentPlusIcon
+  DocumentPlusIcon,
+  EyeIcon,          // Add this
+  PrinterIcon,      // Add this
+  DocumentTextIcon  // Add this
 } from '@heroicons/react/24/outline';
 import { leadService } from '../../lib/leadService';
 import { opportunityApi, type Opportunity } from '../../api/opportunityApi';
@@ -43,7 +46,7 @@ export const KanbanLeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const [showEditSupplierQuote, setShowEditSupplierQuote] = useState<string | null>(null);
   const [terms, setTerms] = useState('');
   const [newTerm, setNewTerm] = useState('');
-
+  const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   useEffect(() => {
     if (isOpen) {
       loadLeadDetails();
@@ -51,85 +54,99 @@ export const KanbanLeadDetailModal: React.FC<LeadDetailModalProps> = ({
   }, [isOpen, leadId]);
 
   const loadLeadDetails = async () => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
+    
+    if (USE_MOCK_DATA) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setLead({
+        id: leadId,
+        contactPerson: 'John Smith',
+        organization: 'TechCorp Industries',
+        title: 'Electronic Components Order',
+        value: 15000,
+        currency: 'USD',
+        label: 'HOT',
+        owner: 'Kaushik Iyer',
+        sourceChannel: 'Website',
+        sourceChannelId: 'WEB-001',
+        sourceOrigin: 'Contact Form',
+        expectedCloseDate: '2025-12-15',
+        leadCreated: '2024-12-01T10:00:00Z',
+        personDetails: {
+          name: 'John Smith',
+          phone: '+1 234 567 8900',
+          email: 'john@techcorp.com',
+          targetSegment: 'Enterprise'
+        },
+        stage: 'OPPORTUNITY'
+      });
       
-      if (USE_MOCK_DATA) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setLead({
-          id: leadId,
-          contactPerson: 'John Smith',
-          organization: 'TechCorp Industries',
-          title: 'Electronic Components Order',
-          value: 15000,
-          currency: 'USD',
-          label: 'HOT',
-          owner: 'Kaushik Iyer',
-          sourceChannel: 'Website',
-          sourceChannelId: 'WEB-001',
-          sourceOrigin: 'Contact Form',
-          expectedCloseDate: '2025-12-15',
-          leadCreated: '2024-12-01T10:00:00Z',
-          personDetails: {
-            name: 'John Smith',
-            phone: '+1 234 567 8900',
-            email: 'john@techcorp.com',
-            targetSegment: 'Enterprise'
-          },
-          stage: 'OPPORTUNITY'
-        });
-        
-        setOpportunities([
-          {
-            id: '1',
-            partNumber: 'PN-45892-A',
-            quantity: 150,
-            regionCountry: 'Germany'
-          },
-          {
-            id: '2',
-            partNumber: 'PN-78945-B',
-            quantity: 200,
-            regionCountry: 'USA'
-          }
-        ]);
+      setOpportunities([
+        {
+          id: '1',
+          partNumber: 'PN-45892-A',
+          quantity: 150,
+          regionCountry: 'Germany'
+        },
+        {
+          id: '2',
+          partNumber: 'PN-78945-B',
+          quantity: 200,
+          regionCountry: 'USA'
+        }
+      ]);
 
-        setSupplierQuotes([
-          {
-            id: '1',
-            partNumber: 'PN-45892-A',
-            supplierName: 'Global Electronics',
-            manufacturer: 'Intel',
-            quantity: 150,
-            amount: 12500,
-            testingType: 'Electrical',
-            estimatedDate: '2025-01-15',
-            rohsCompliant: true,
-            notes: {
-              text: 'Sample quotation',
-              fileUrls: []
-            },
-            stage: 'QUOTATION_RECEIVED_FROM_SUPPLIER'
-          }
-        ]);
+      setSupplierQuotes([
+        {
+          id: '1',
+          partNumber: 'PN-45892-A',
+          supplierName: 'Global Electronics',
+          manufacturer: 'Intel',
+          quantity: 150,
+          amount: 12500,
+          testingType: 'Electrical',
+          estimatedDate: '2025-01-15',
+          rohsCompliant: true,
+          notes: {
+            text: 'Sample quotation',
+            fileUrls: []
+          },
+          stage: 'QUOTATION_RECEIVED_FROM_SUPPLIER'
+        }
+      ]);
 
-        setTerms('Standard payment terms: Net 30 days\nShipping: FOB Origin\nWarranty: 1 year manufacturer warranty');
-      } else {
-        const leadData = await leadService.getLeadById(leadId);
-        setLead(leadData);
-        
+      setTerms('Standard payment terms: Net 30 days\nShipping: FOB Origin\nWarranty: 1 year manufacturer warranty');
+    } else {
+      const leadData = await leadService.getLeadById(leadId);
+      setLead(leadData);
+      
+      // Try to load opportunities, but don't fail if it errors
+      try {
         const opps = await opportunityApi.getAll();
         setOpportunities(opps);
-        
+      } catch (oppError) {
+        console.warn('Failed to load opportunities:', oppError);
+        setOpportunities([]);
+      }
+      
+      // Try to load supplier quotes, but don't fail if it errors
+      try {
         const quotes = await quotationSupplierApi.getAll();
         setSupplierQuotes(quotes);
+      } catch (quoteError) {
+        console.warn('Failed to load supplier quotes:', quoteError);
+        setSupplierQuotes([]);
       }
-    } catch (error) {
-      console.error('Failed to load lead details:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error) {
+    console.error('Failed to load lead details:', error);
+    // Show error to user but don't crash
+    alert('Failed to load some lead details. Please try refreshing the page.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (!isOpen) return null;
 
@@ -1025,28 +1042,45 @@ const TermsTab: React.FC<{
 };
 
 // Generate Documents Tab Component
-const GenerateTab: React.FC<{ lead: any }> = ({ lead }) => {
-  const documents = [
-    { id: 'quotation', name: 'Quotation', description: 'Generate customer quotation' },
-    { id: 'invoice', name: 'Invoice', description: 'Generate invoice document' },
-    { id: 'po', name: 'Purchase Order', description: 'Generate PO document' },
-    { id: 'bill', name: 'Bill of Materials', description: 'Generate BOM' },
-    { id: 'contract', name: 'Contract', description: 'Generate contract document' },
-  ];
+// Add this to your KanbanLeadDetailModal.tsx after all the existing tab components
 
-  const handleGenerate = (docType: string) => {
-    alert(`Generating ${docType} for ${lead.title}`);
-  };
+// Replace the GenerateTab component with this updated version
+const GenerateTab: React.FC<{ lead: any }> = ({ lead }) => {
+  const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+
+  if (showInvoiceForm) {
+    return <InvoiceForm leadId={lead.id} onBack={() => setShowInvoiceForm(false)} />;
+  }
+
+  const documents = [
+    { 
+      id: 'invoice', 
+      name: 'Invoice/Purchase Order', 
+      description: 'Generate invoice or purchase order document', 
+      action: () => setShowInvoiceForm(true) 
+    },
+    { 
+      id: 'quotation', 
+      name: 'Quotation', 
+      description: 'Generate customer quotation', 
+      action: () => alert('Quotation generation coming soon') 
+    },
+    { 
+      id: 'contract', 
+      name: 'Contract', 
+      description: 'Generate contract document', 
+      action: () => alert('Contract generation coming soon') 
+    },
+  ];
 
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900">Generate Documents</h3>
-      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {documents.map((doc) => (
           <button
             key={doc.id}
-            onClick={() => handleGenerate(doc.name)}
+            onClick={doc.action}
             className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md hover:border-indigo-300 transition-all text-left group"
           >
             <div className="flex items-start justify-between">
@@ -1063,4 +1097,797 @@ const GenerateTab: React.FC<{ lead: any }> = ({ lead }) => {
       </div>
     </div>
   );
-}
+};
+
+// Add this InvoiceForm component (place it before the closing export)
+const InvoiceForm: React.FC<{ leadId: string; onBack: () => void }> = ({ leadId, onBack }) => {
+  const [loading, setLoading] = useState(false);
+  const [generated, setGenerated] = useState<{ html: string; message: string } | null>(null);
+  const [formData, setFormData] = useState({
+    registeredOffice: 'Bangalore Head Office, India',
+    title: 'PURCHASE_ORDER' as 'PURCHASE_ORDER' | 'INVOICE' | 'QUOTATION',
+    incoterms: 'EXW',
+    paymentTerms: 'Net 30',
+    dueDate: '',
+    customerDetails: { name: '', email: '', address: '', tel: '', taxId: '' },
+    partDetailsList: [{
+      partNumber: '', manufacturer: '', shortDescription: '', DC: '', HSNcode: '',
+      quantity: '', units: 'PCS', pricePerUnit: '', currency: 'INR', leadTime: '', total: '0'
+    }],
+    discount: '', additionalCharges: '', tax: '', balanceDue: '',
+    bankDetailsType: 'IN' as 'IN' | 'UAE',
+    bankDetailsIn: { accountName: '', bankName: '', branchAddress: '', accountNumber: '', swiftCode: '', ifscCode: '' },
+    bankDetailsUae: { accountName: '', bankName: '', branchAddress: '', accountNumber: '', ibanNumber: '', swiftCode: '' }
+  });
+
+  const addPart = () => setFormData({ 
+    ...formData, 
+    partDetailsList: [...formData.partDetailsList, {
+      partNumber: '', manufacturer: '', shortDescription: '', DC: '', HSNcode: '',
+      quantity: '', units: 'PCS', pricePerUnit: '', currency: 'INR', leadTime: '', total: '0'
+    }]
+  });
+
+  const removePart = (i: number) => setFormData({ 
+    ...formData, 
+    partDetailsList: formData.partDetailsList.filter((_, idx) => idx !== i) 
+  });
+
+  const updatePart = (i: number, field: string, value: any) => {
+    const parts = [...formData.partDetailsList];
+    parts[i] = { ...parts[i], [field]: value };
+    if (field === 'quantity' || field === 'pricePerUnit') {
+      const qty = parseFloat(parts[i].quantity) || 0;
+      const price = parseFloat(parts[i].pricePerUnit) || 0;
+      parts[i].total = (qty * price).toFixed(2);
+    }
+    setFormData({ ...formData, partDetailsList: parts });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      // Prepare request body - remove bankDetailsType and include only selected bank
+      const body: any = {
+        registeredOffice: formData.registeredOffice,
+        title: formData.title,
+        incoterms: formData.incoterms,
+        paymentTerms: formData.paymentTerms,
+        dueDate: formData.dueDate,
+        customerDetails: formData.customerDetails,
+        partDetailsList: formData.partDetailsList.map(part => ({
+          ...part,
+          quantity: part.quantity.toString(),
+          pricePerUnit: parseFloat(part.pricePerUnit) || 0,
+          total: part.total
+        })),
+        discount: parseFloat(formData.discount) || 0,
+        additionalCharges: parseFloat(formData.additionalCharges) || 0,
+        tax: parseFloat(formData.tax) || 0,
+        balanceDue: parseFloat(formData.balanceDue) || 0,
+      };
+
+      // Add only the selected bank details
+      if (formData.bankDetailsType === 'UAE') {
+        body.bankDetailsUae = formData.bankDetailsUae;
+      } else {
+        body.bankDetailsIn = formData.bankDetailsIn;
+      }
+
+      console.log('Sending invoice request:', body);
+
+      const response = await fetch(
+        `https://crm-dev0-template-and-tracking-service-v1.make-tronics.com/invoice/create/${leadId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Invoice generation failed:', errorData);
+        throw new Error(errorData.message || 'Failed to generate invoice');
+      }
+
+      const data = await response.json();
+      console.log('Invoice generated successfully:', data);
+      
+      setGenerated({ 
+        html: data.html || data.template || '', 
+        message: data.message || 'Invoice generated successfully!' 
+      });
+    } catch (error: any) {
+      console.error('Error generating invoice:', error);
+      alert(error.message || 'Failed to generate invoice. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // If invoice is generated, show preview
+  if (generated) {
+    return (
+      <div className="space-y-4">
+        <button 
+          onClick={onBack} 
+          className="text-indigo-600 hover:text-indigo-800 font-medium"
+        >
+          ← Back to Documents
+        </button>
+        
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <p className="text-green-800 font-medium">{generated.message}</p>
+        </div>
+        
+        <div className="flex space-x-3">
+          <button 
+            onClick={() => { 
+              const w = window.open('', '_blank'); 
+              if (w) {
+                w.document.write(generated.html); 
+                w.document.close();
+              }
+            }}
+            className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center space-x-2"
+          >
+            <EyeIcon className="w-5 h-5" />
+            <span>View Invoice</span>
+          </button>
+          
+          <button 
+            onClick={() => { 
+              const w = window.open('', '_blank'); 
+              if (w) {
+                w.document.write(generated.html); 
+                w.document.close(); 
+                w.print();
+              }
+            }}
+            className="flex-1 px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center justify-center space-x-2"
+          >
+            <PrinterIcon className="w-5 h-5" />
+            <span>Print Invoice</span>
+          </button>
+          
+          <button 
+            onClick={() => setGenerated(null)} 
+            className="px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+          >
+            Generate Another
+          </button>
+        </div>
+        
+        <div className="border border-gray-300 rounded-lg overflow-hidden bg-white">
+          <div 
+            className="p-4 max-h-[600px] overflow-auto"
+            dangerouslySetInnerHTML={{ __html: generated.html }} 
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Show the form
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <button 
+        type="button" 
+        onClick={onBack} 
+        className="text-indigo-600 hover:text-indigo-800 font-medium"
+      >
+        ← Back to Documents
+      </button>
+      
+      {/* Basic Information */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Registered Office <span className="text-red-500">*</span>
+            </label>
+            <input 
+              required 
+              value={formData.registeredOffice} 
+              onChange={(e) => setFormData({ ...formData, registeredOffice: e.target.value })} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Document Type <span className="text-red-500">*</span>
+            </label>
+            <select 
+              required 
+              value={formData.title} 
+              onChange={(e) => setFormData({ ...formData, title: e.target.value as any })} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="PURCHASE_ORDER">Purchase Order</option>
+              <option value="INVOICE">Invoice</option>
+              <option value="QUOTATION">Quotation</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Incoterms <span className="text-red-500">*</span>
+            </label>
+            <input 
+              required 
+              value={formData.incoterms} 
+              onChange={(e) => setFormData({ ...formData, incoterms: e.target.value })} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="EXW, FOB, CIF, etc."
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Payment Terms <span className="text-red-500">*</span>
+            </label>
+            <input 
+              required 
+              value={formData.paymentTerms} 
+              onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Net 30, Net 60, etc."
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Due Date <span className="text-red-500">*</span>
+            </label>
+            <input 
+              required 
+              type="date" 
+              value={formData.dueDate} 
+              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Customer Details */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer Details</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Customer Name <span className="text-red-500">*</span>
+            </label>
+            <input 
+              required 
+              value={formData.customerDetails.name} 
+              onChange={(e) => setFormData({ ...formData, customerDetails: { ...formData.customerDetails, name: e.target.value }})} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="ABC Technologies Pvt Ltd"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email <span className="text-red-500">*</span>
+            </label>
+            <input 
+              required 
+              type="email" 
+              value={formData.customerDetails.email} 
+              onChange={(e) => setFormData({ ...formData, customerDetails: { ...formData.customerDetails, email: e.target.value }})} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="accounts@company.com"
+            />
+          </div>
+          
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Address <span className="text-red-500">*</span>
+            </label>
+            <textarea 
+              required 
+              value={formData.customerDetails.address} 
+              onChange={(e) => setFormData({ ...formData, customerDetails: { ...formData.customerDetails, address: e.target.value }})} 
+              rows={2} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="123 Business Park, City, Country"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Telephone
+            </label>
+            <input 
+              type="tel" 
+              value={formData.customerDetails.tel} 
+              onChange={(e) => setFormData({ ...formData, customerDetails: { ...formData.customerDetails, tel: e.target.value }})} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="+91-9876543210"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tax ID / GST Number
+            </label>
+            <input 
+              value={formData.customerDetails.taxId} 
+              onChange={(e) => setFormData({ ...formData, customerDetails: { ...formData.customerDetails, taxId: e.target.value }})} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="29ABCDE1234F1Z5"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Part Details */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Part Details</h3>
+          <button 
+            type="button" 
+            onClick={addPart} 
+            className="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center space-x-1"
+          >
+            <PlusIcon className="w-4 h-4" />
+            <span>Add Part</span>
+          </button>
+        </div>
+        
+        <div className="space-y-4">
+          {formData.partDetailsList.map((part, i) => (
+            <div key={i} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">Part {i + 1}</h4>
+                {formData.partDetailsList.length > 1 && (
+                  <button 
+                    type="button" 
+                    onClick={() => removePart(i)} 
+                    className="text-red-600 hover:text-red-800 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Part Number <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    required 
+                    value={part.partNumber} 
+                    onChange={(e) => updatePart(i, 'partNumber', e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="PN-1001"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Manufacturer <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    required 
+                    value={part.manufacturer} 
+                    onChange={(e) => updatePart(i, 'manufacturer', e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Texas Instruments"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    required 
+                    value={part.shortDescription} 
+                    onChange={(e) => updatePart(i, 'shortDescription', e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Voltage Regulator IC"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date Code (DC) <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    required 
+                    value={part.DC} 
+                    onChange={(e) => updatePart(i, 'DC', e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="2024"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    HSN Code
+                  </label>
+                  <input 
+                    value={part.HSNcode} 
+                    onChange={(e) => updatePart(i, 'HSNcode', e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="85423190"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quantity <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    required 
+                    value={part.quantity} 
+                    onChange={(e) => updatePart(i, 'quantity', e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="10"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Units <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    required 
+                    value={part.units} 
+                    onChange={(e) => updatePart(i, 'units', e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="PCS"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price per Unit <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    required 
+                    type="number" 
+                    step="0.01" 
+                    value={part.pricePerUnit} 
+                    onChange={(e) => updatePart(i, 'pricePerUnit', e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="125.50"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Currency <span className="text-red-500">*</span>
+                  </label>
+                  <select 
+                    required 
+                    value={part.currency} 
+                    onChange={(e) => updatePart(i, 'currency', e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="INR">INR</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Lead Time <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    required 
+                    value={part.leadTime} 
+                    onChange={(e) => updatePart(i, 'leadTime', e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="2 weeks"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Total Amount
+                  </label>
+                  <input 
+                    value={part.total} 
+                    readOnly 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 font-medium"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Financial Details */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Details</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Discount</label>
+            <input 
+              type="number" 
+              step="0.01" 
+              value={formData.discount} 
+              onChange={(e) => setFormData({ ...formData, discount: e.target.value })} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              placeholder="0.00"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Additional Charges</label>
+            <input 
+              type="number" 
+              step="0.01" 
+              value={formData.additionalCharges} 
+              onChange={(e) => setFormData({ ...formData, additionalCharges: e.target.value })} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              placeholder="0.00"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tax</label>
+            <input 
+              type="number" 
+              step="0.01" 
+              value={formData.tax} 
+              onChange={(e) => setFormData({ ...formData, tax: e.target.value })} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              placeholder="0.00"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Balance Due</label>
+            <input 
+              type="number" 
+              step="0.01" 
+              value={formData.balanceDue} 
+              onChange={(e) => setFormData({ ...formData, balanceDue: e.target.value })} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Bank Details */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Bank Details</h3>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Select Bank Location <span className="text-red-500">*</span>
+          </label>
+          <div className="flex space-x-6">
+            <label className="flex items-center cursor-pointer">
+              <input 
+                type="radio" 
+                value="IN" 
+                checked={formData.bankDetailsType === 'IN'} 
+                onChange={() => setFormData({ ...formData, bankDetailsType: 'IN' })} 
+                className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">India (IN)</span>
+            </label>
+            <label className="flex items-center cursor-pointer">
+              <input 
+                type="radio" 
+                value="UAE" 
+                checked={formData.bankDetailsType === 'UAE'} 
+                onChange={() => setFormData({ ...formData, bankDetailsType: 'UAE' })} 
+                className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">UAE</span>
+            </label>
+          </div>
+        </div>
+
+        {formData.bankDetailsType === 'IN' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Account Name <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsIn.accountName} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsIn: { ...formData.bankDetailsIn, accountName: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="John Doe"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bank Name <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsIn.bankName} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsIn: { ...formData.bankDetailsIn, bankName: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="HDFC Bank"
+              />
+            </div>
+            
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Branch Address <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsIn.branchAddress} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsIn: { ...formData.bankDetailsIn, branchAddress: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="123 MG Road, Bangalore, Karnataka 560001"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Account Number <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsIn.accountNumber} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsIn: { ...formData.bankDetailsIn, accountNumber: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="50100123456789"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                SWIFT Code <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsIn.swiftCode} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsIn: { ...formData.bankDetailsIn, swiftCode: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="HDFCINBB"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                IFSC Code <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsIn.ifscCode} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsIn: { ...formData.bankDetailsIn, ifscCode: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="HDFC0001234"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Account Name <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsUae.accountName} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsUae: { ...formData.bankDetailsUae, accountName: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="Maketronics DMCC"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bank Name <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsUae.bankName} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsUae: { ...formData.bankDetailsUae, bankName: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="Emirates NBD"
+              />
+            </div>
+            
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Branch Address <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsUae.branchAddress} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsUae: { ...formData.bankDetailsUae, branchAddress: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="Dubai Branch"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Account Number <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsUae.accountNumber} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsUae: { ...formData.bankDetailsUae, accountNumber: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="1234567890"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                IBAN Number <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsUae.ibanNumber} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsUae: { ...formData.bankDetailsUae, ibanNumber: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="AE070331234567890123456"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                SWIFT Code <span className="text-red-500">*</span>
+              </label>
+              <input 
+                required 
+                value={formData.bankDetailsUae.swiftCode} 
+                onChange={(e) => setFormData({ ...formData, bankDetailsUae: { ...formData.bankDetailsUae, swiftCode: e.target.value }})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="EBILAEAD"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Submit Buttons */}
+      <div className="flex justify-end space-x-3 pt-4">
+        <button 
+          type="button" 
+          onClick={onBack} 
+          className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+        >
+          Cancel
+        </button>
+        <button 
+          type="submit" 
+          disabled={loading} 
+          className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+        >
+          {loading ? (
+            <>
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Generating...</span>
+            </>
+          ) : (
+            <>
+              <DocumentTextIcon className="w-5 h-5" />
+              <span>Generate Invoice</span>
+            </>
+          )}
+        </button>
+      </div>
+    </form>
+  );
+};
